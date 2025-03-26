@@ -328,7 +328,32 @@ Open *main.go* and add this in the *main* function
 	defer db.Close()
 ```
 
-### B4 - Create the Movie Repository
+### B4 - Add field metadata to models
+
+Modify the models to add metadata such as with *models/movie.go*
+
+```go
+package models
+
+type Movie struct {
+	ID          int      `json:"id"`
+	TMDB_ID     int      `json:"tmdb_id,omitempty"`
+	Title       string   `json:"title"`
+	Tagline     *string  `json:"tagline,omitempty"`
+	ReleaseYear int      `json:"release_year"`
+	Genres      []Genre  `json:"genres"`
+	Overview    *string  `json:"overview,omitempty"`
+	Score       *float32 `json:"score,omitempty"`
+	Popularity  *float32 `json:"popularity,omitempty"`
+	Keywords    []string `json:"keywords"`
+	Language    *string  `json:"language,omitempty"`
+	PosterURL   *string  `json:"poster_url,omitempty"`
+	TrailerURL  *string  `json:"trailer_url,omitempty"`
+	Casting     []Actor  `json:"casting"`
+}
+```
+
+### B5 - Create the Movie Repository
 
 Create *data/movie_repository.go
 
@@ -440,7 +465,7 @@ Update handler instance in *main.go* to use the new structure:
 movieHandler := handlers.NewMovieHandler(movieRepo, logInstance)	
 ```
 
-### B5 - Finish the Movie Repository
+### B6 - Finish the Movie Repository
 
 The final *movie_repository.go* should look like
 
@@ -702,7 +727,7 @@ var (
 
 ```
 
-### B6 - Finish the handlers
+### B7 - Finish the handlers
 
 The final *movies_handler.go* file should look like
 
@@ -1229,4 +1254,1491 @@ export class YouTubeEmbed extends HTMLElement {
 }
 
 customElements.define("youtube-embed", YouTubeEmbed);
+```
+
+## E-Client Side Routing
+
+### E1 - Routes
+
+Let's create our routes for the client in */services/Routes.js* and boilerplate code for all the Web Components.
+
+```js
+export const routes = [
+    {
+        path: "/",
+        component: HomePage
+    },
+    {
+        path: "/movies",
+        component: MoviesPage
+    },
+    {
+        path: /\/movies\/(\d+)/,
+        component: MovieDetailsPage
+    },
+    {
+        path: "/account/register",
+        component: RegisterPage
+    },
+    {
+        path: "/account/login",
+        component: LoginPage
+    },     
+    {
+        path: "/account/",
+        component: AccountPage
+    },
+    {
+        path: "/account/favorites",
+        component: FavoritesPage
+    },	
+{
+        path: "/account/watchlist",
+        component: WatchlistPage
+    },	
+]
+```
+
+### E2 - The Router
+
+Now let's make the router in *services/Router.js*
+
+```js
+import { routes } from "./Routes.js";
+
+const Router = {
+    init: () => {
+        document.querySelectorAll("a.navlink").forEach(a => {
+            a.addEventListener("click", event => {
+                event.preventDefault();
+                const href = a.getAttribute("href");
+                Router.go(href);
+            });
+        });  
+        window.addEventListener("popstate", () => {
+            Router.go(location.pathname, false);
+        });      
+        // Process initial URL   
+        Router.go(location.pathname + location.search);
+    },
+    go: (route, addToHistory=true) => {
+        if (addToHistory) {
+            history.pushState(null, "", route);
+        }
+        const routePath = route.includes('?') ? route.split('?')[0] : route;
+        let pageElement = null;
+        for (const r of routes) {
+            if (typeof r.path === "string" && r.path === routePath) {
+                pageElement = new r.component();
+                break;
+            } else if (r.path instanceof RegExp) {
+                const match = r.path.exec(route);
+                if (match) {
+                    const params = match.slice(1);
+                    pageElement = new r.component();
+                    pageElement.params = params;                    
+                    break;
+                }
+            }
+        }
+        if (pageElement==null) {
+            pageElement = document.createElement("h1");
+            pageElement.textContent = "Page not found";
+        }       
+
+		document.querySelector("main").innerHTML = "";
+		document.querySelector("main").appendChild(pageElement); 
+    }
+
+}
+
+export default Router;
+```
+
+Now let's add the Router to app in `app.js` and call init to enhance our links
+
+```js
+window.app = { 
+    API,
+    Router,
+}
+window.addEventListener("DOMContentLoaded", () => {
+    app.Router.init();
+})
+```
+
+### E3 - Server-side dynamic routes
+
+When we refresh the page on dynamic routes, we get a 404, to solve the problem, let's add some new Handlers in our backend, adding them before the file serving at *main.go*:
+
+```go
+	// Handler catch-all
+	catchAllHandler := func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./public/index.html")
+	}
+	http.HandleFunc("/movies", catchAllHandler)
+	http.HandleFunc("/movies/", catchAllHandler)
+	http.HandleFunc("/account/", catchAllHandler)
+```
+### E4 - Animating the transition
+
+At *Router.js* we can remove the last two code lines with this:
+
+```js
+	function updatePage() {
+		document.querySelector("main").innerHTML = "";
+		document.querySelector("main").appendChild(pageElement); 
+	}
+
+	if (!document.startViewTransition) {
+		updatePage();
+	} else {
+		const oldPage = document.querySelector("main").firstElementChild;
+		if (oldPage) oldPage.style.viewTransitionName = "old";
+		pageElement.style.viewTransitionName = "new";
+		document.startViewTransition( () => updatePage() );
+	}
+```
+
+### E5 - Error Messages
+
+Add in *index.html*
+
+```html
+ <!-- Alert Modal -->
+<dialog id="alert-modal">
+	<h3>Error</h3>
+	<p>There was an error loading the page</p>
+	<button class="action-btn" onclick="app.closeError()">OK</button>
+</dialog>
+```
+
+Then, in *app.js*
+
+```js
+window.app = { 
+	// ...
+    showError: (message = 'There was an error loading the page', goToHome=true) => {
+        document.querySelector("#alert-modal").showModal()
+		document.querySelector("#alert-modal p").textContents = message;
+        if (goToHome) app.Router.go("/");
+        return;
+    },
+    closeError: () => {
+        document.getElementById('alert-modal').close()        
+    },
+	// ...
+}
+```
+
+## F-The Search Section
+
+### F1 - The MoviesPage
+
+Add the template in *index.html*
+
+```html
+<template id="template-movies">
+        <section>
+            <div id="search-header">
+                <h2></h2>
+                <section id="filters">
+                    <select id="filter" onchange="app.searchFilterChange(this.value)">
+                        <option>Filter by Genre</option>                        
+                    </select>
+                    <select id="order" onchange="app.searchOrderChange(this.value)">
+                        <option value="popularity">Sort by Popularity</option>
+                        <option value="score">Sort by Score</option>
+                        <option value="date">Sort by Release Date</option>
+                        <option value="name">Sort by Name</option>
+                    </select>
+                </section>
+            </div>
+            <ul id="movies-result">
+                <animated-loading data-elements="5"
+                    data-width="150px" data-height="220px">
+                </animated-loading> 
+            </ul>
+        </section>
+    </template> 
+```
+
+And then for the Web Component *MoviesPage*
+
+```js
+import API from "../services/API.js";
+import { MovieItemComponent } from "./MovieItem.js";
+
+export default class MoviesPage extends HTMLElement {
+    
+    async render(query) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const order = urlParams.get("order") ?? "";
+        const genre = urlParams.get("genre") ?? "";
+
+        const movies = await API.searchMovies(query, order, genre);
+        
+        const ulMovies = this.querySelector("ul");
+        ulMovies.innerHTML = "";
+        if (movies && movies.length>0) {
+            movies.forEach(movie => {
+                const li = document.createElement("li");
+                li.appendChild(new MovieItemComponent(movie));
+                ulMovies.appendChild(li);
+            });    
+        } else {
+            ulMovies.innerHTML = "<h3>There are no movies with your search</h3>";
+        }        
+
+        //await this.loadGenres();
+
+        if (order) this.querySelector("#order").value = order;
+        if (genre) this.querySelector("#filter").value = genre;
+
+    }
+    
+   
+    connectedCallback() {
+        const template = document.getElementById("template-movies");
+        const content = template.content.cloneNode(true);
+        this.appendChild(content);  
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const query = urlParams.get('q');
+        if (query) {
+            this.querySelector("h2").textContent = `'${query}' movies`;
+            this.render(query);
+        } else {
+            app.showError();
+        }
+    }
+}
+customElements.define("movies-page", MoviesPage);
+```
+
+At *app.js* add the following function to app
+
+```js
+// ...
+    search: (event) => {
+        event.preventDefault();
+        const keywords = document.querySelector("input[type=search]").value;
+        if (keywords.length>1) {
+            app.Router.go(`/movies?q=${keywords}`)
+        }
+    },
+// ...	
+```
+
+### F2 - Connecting the Filter with Genre
+
+Add in *MoviesComponent.js*
+
+```js
+ async loadGenres() {
+	const genres = await API.getGenres();
+	const select = this.querySelector("#filter");
+	select.innerHTML = `
+		<option value=''>Filter by Genre</option>
+	`;
+	genres.forEach(genre => {
+		var option = document.createElement("option");
+		option.value = genre.id;
+		option.textContent = genre.name;
+		select.appendChild(option);
+	})
+}
+```
+
+Call it from *connectedCallback*
+
+### F3 - Adding Support for Order and Filter
+
+In *app.js* add the new functions to the app object:
+
+```js
+// ...
+    searchOrderChange: (order) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const q = urlParams.get("q");
+        const genre = urlParams.get("genre") ?? "";
+        app.Router.go(`/movies?q=${q}&order=${order}&genre=${genre}`);
+    },
+    searchFilterChange: (genre) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const q = urlParams.get("q");
+        const order = urlParams.get("order") ?? "";
+        app.Router.go(`/movies?q=${q}&order=${order}&genre=${genre}`);
+// ...
+    }
+```
+
+
+## G-Authentication
+
+### G1 - Adding the new Storage
+
+Let's add a new dependency, executing:
+
+```
+go get "golang.org/x/crypto/bcrypt"
+```
+
+
+Let's add a new interface in *data/interfaces.go*
+
+```go
+type AccountStorage interface {
+	Authenticate(string, string) (bool, error)
+	Register(string, string, string) (bool, error)
+	GetAccountDetails(string) (models.User, error)
+	SaveCollection(models.User, int, string) (bool, error)
+}
+```
+And we create a new implementation at *data/account_repository.go*
+
+```go
+package data
+
+import (
+	"database/sql"
+	"errors"
+	"time"
+
+	"frontendmasters.com/movies/logger"
+	"frontendmasters.com/movies/models"
+	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type AccountRepository struct {
+	db     *sql.DB
+	logger *logger.Logger
+}
+
+func NewAccountRepository(db *sql.DB, log *logger.Logger) (*AccountRepository, error) {
+	return &AccountRepository{
+		db:     db,
+		logger: log,
+	}, nil
+}
+
+func (r *AccountRepository) Register(name, email, password string) (bool, error) {
+	// Validate basic requirements
+	if name == "" || email == "" || password == "" {
+		r.logger.Error("Registration validation failed: missing required fields", nil)
+		return false, ErrRegistrationValidation
+	}
+
+	// Check if user already exists
+	var exists bool
+	err := r.db.QueryRow(`
+		SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)
+	`, email).Scan(&exists)
+	if err != nil {
+		r.logger.Error("Failed to check existing user", err)
+		return false, err
+	}
+	if exists {
+		r.logger.Error("User already exists with email: "+email, ErrUserAlreadyExists)
+		return false, ErrUserAlreadyExists
+	}
+
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		r.logger.Error("Failed to hash password", err)
+		return false, err
+	}
+
+	// Insert new user
+	query := `
+		INSERT INTO users (name, email, password_hashed, time_created)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`
+	var userID int
+	err = r.db.QueryRow(
+		query,
+		name,
+		email,
+		string(hashedPassword),
+		time.Now(),
+	).Scan(&userID)
+	if err != nil {
+		r.logger.Error("Failed to register user", err)
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (r *AccountRepository) Authenticate(email string, password string) (bool, error) {
+	if email == "" || password == "" {
+		r.logger.Error("Authentication validation failed: missing credentials", nil)
+		return false, ErrAuthenticationValidation
+	}
+
+	// Fetch user by email
+	var user models.User
+	query := `
+		SELECT id, name, email, password_hashed
+		FROM users 
+		WHERE email = $1 AND time_deleted IS NULL
+	`
+	err := r.db.QueryRow(query, email).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.PasswordHashed,
+	)
+	if err == sql.ErrNoRows {
+		r.logger.Error("User not found for email: "+email, nil)
+		return false, ErrAuthenticationValidation
+	}
+	if err != nil {
+		r.logger.Error("Failed to query user for authentication", err)
+		return false, err
+	}
+
+	// Verify password
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHashed), []byte(password))
+	if err != nil {
+		r.logger.Error("Password mismatch for email: "+email, nil)
+		return false, ErrAuthenticationValidation
+	}
+
+	// Update last login time
+	updateQuery := `
+		UPDATE users 
+		SET last_login = $1
+		WHERE id = $2
+	`
+	_, err = r.db.Exec(updateQuery, time.Now(), user.ID)
+	if err != nil {
+		r.logger.Error("Failed to update last login", err)
+		// Don't fail authentication just because last login update failed
+	}
+
+	return true, nil
+}
+
+func (r *AccountRepository) GetAccountDetails(email string) (models.User, error) {
+	var user models.User
+	query := `
+		SELECT id, name, email
+		FROM users 
+		WHERE email = $1 AND time_deleted IS NULL
+	`
+	err := r.db.QueryRow(query, email).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+	)
+	if err == sql.ErrNoRows {
+		r.logger.Error("User not found for email: "+email, nil)
+		return models.User{}, ErrUserNotFound
+	}
+	if err != nil {
+		r.logger.Error("Failed to query user by email", err)
+		return models.User{}, err
+	}
+
+	// Fetch favorites
+	favoritesQuery := `
+		SELECT m.id, m.tmdb_id, m.title, m.tagline, m.release_year, 
+		       m.overview, m.score, m.popularity, m.language, 
+		       m.poster_url, m.trailer_url
+		FROM movies m
+		JOIN user_movies um ON m.id = um.movie_id
+		WHERE um.user_id = $1 AND um.relation_type = 'favorite'
+	`
+	favoriteRows, err := r.db.Query(favoritesQuery, user.ID)
+	if err != nil {
+		r.logger.Error("Failed to query user favorites", err)
+		return user, err
+	}
+	defer favoriteRows.Close()
+
+	for favoriteRows.Next() {
+		var m models.Movie
+		if err := favoriteRows.Scan(
+			&m.ID, &m.TMDB_ID, &m.Title, &m.Tagline, &m.ReleaseYear,
+			&m.Overview, &m.Score, &m.Popularity, &m.Language,
+			&m.PosterURL, &m.TrailerURL,
+		); err != nil {
+			r.logger.Error("Failed to scan favorite movie row", err)
+			return user, err
+		}
+		user.Favorites = append(user.Favorites, m)
+	}
+
+	// Fetch watchlist
+	watchlistQuery := `
+		SELECT m.id, m.tmdb_id, m.title, m.tagline, m.release_year, 
+		       m.overview, m.score, m.popularity, m.language, 
+		       m.poster_url, m.trailer_url
+		FROM movies m
+		JOIN user_movies um ON m.id = um.movie_id
+		WHERE um.user_id = $1 AND um.relation_type = 'watchlist'
+	`
+	watchlistRows, err := r.db.Query(watchlistQuery, user.ID)
+	if err != nil {
+		r.logger.Error("Failed to query user watchlist", err)
+		return user, err
+	}
+	defer watchlistRows.Close()
+
+	for watchlistRows.Next() {
+		var m models.Movie
+		if err := watchlistRows.Scan(
+			&m.ID, &m.TMDB_ID, &m.Title, &m.Tagline, &m.ReleaseYear,
+			&m.Overview, &m.Score, &m.Popularity, &m.Language,
+			&m.PosterURL, &m.TrailerURL,
+		); err != nil {
+			r.logger.Error("Failed to scan watchlist movie row", err)
+			return user, err
+		}
+		user.Watchlist = append(user.Watchlist, m)
+	}
+
+	return user, nil
+}
+
+func (r *AccountRepository) SaveCollection(user models.User, movieID int, collection string) (bool, error) {
+	// Validate inputs
+	if movieID <= 0 {
+		r.logger.Error("SaveCollection failed: invalid movie ID", nil)
+		return false, errors.New("invalid movie ID")
+	}
+	if collection != "favorite" && collection != "watchlist" {
+		r.logger.Error("SaveCollection failed: invalid collection type", nil)
+		return false, errors.New("collection must be 'favorite' or 'watchlist'")
+	}
+
+	// Get user ID from email
+	var userID int
+	err := r.db.QueryRow(`
+		SELECT id 
+		FROM users 
+		WHERE email = $1 AND time_deleted IS NULL
+	`, user.Email).Scan(&userID)
+	if err == sql.ErrNoRows {
+		r.logger.Error("User not found", nil)
+		return false, ErrUserNotFound
+	}
+	if err != nil {
+		r.logger.Error("Failed to query user ID", err)
+		return false, err
+	}
+
+	// Check if the relationship already exists
+	var exists bool
+	err = r.db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 
+			FROM user_movies 
+			WHERE user_id = $1 
+			AND movie_id = $2 
+			AND relation_type = $3
+		)
+	`, userID, movieID, collection).Scan(&exists)
+	if err != nil {
+		r.logger.Error("Failed to check existing collection entry", err)
+		return false, err
+	}
+	if exists {
+		r.logger.Info("Movie already in " + collection + " for user")
+		return true, nil // Return true since the movie is already in the collection
+	}
+
+	// Insert the new relationship
+	query := `
+		INSERT INTO user_movies (user_id, movie_id, relation_type, time_added)
+		VALUES ($1, $2, $3, $4)
+	`
+	_, err = r.db.Exec(query, userID, movieID, collection, time.Now())
+	if err != nil {
+		r.logger.Error("Failed to save movie to "+collection, err)
+		return false, err
+	}
+
+	r.logger.Info("Successfully added movie " + string(movieID) + " to " + collection + " for user")
+	return true, nil
+}
+
+var (
+	ErrRegistrationValidation   = errors.New("registration failed")
+	ErrAuthenticationValidation = errors.New("authentication failed")
+	ErrUserAlreadyExists        = errors.New("user already exists")
+	ErrUserNotFound             = errors.New("user not found")
+)
+
+```
+
+### G2 - Add the handlers
+
+Now we create `handlers/account_handlers.go`
+
+```go
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"strings"
+
+	"frontendmasters.com/movies/data"
+	"frontendmasters.com/movies/logger"
+	"frontendmasters.com/movies/models"
+	"frontendmasters.com/movies/token"
+)
+
+// Define request structure
+type RegisterRequest struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// Define request structure
+type AuthRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type AuthResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type AccountHandler struct {
+	storage data.AccountStorage
+	logger  *logger.Logger
+}
+
+// Utility functions
+func (h *AccountHandler) writeJSONResponse(w http.ResponseWriter, data interface{}) error {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		h.logger.Error("Failed to encode response", err)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return err
+	}
+	return nil
+}
+
+func (h *AccountHandler) handleStorageError(w http.ResponseWriter, err error, context string) bool {
+	if err != nil {
+		switch err {
+		case data.ErrAuthenticationValidation, data.ErrUserAlreadyExists, data.ErrRegistrationValidation:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(AuthResponse{Success: false, Message: err.Error()})
+			return true
+		case data.ErrUserNotFound:
+			http.Error(w, "User not found", http.StatusNotFound)
+			return true
+		default:
+			h.logger.Error(context, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return true
+		}
+	}
+	return false
+}
+
+func (h *AccountHandler) Register(w http.ResponseWriter, r *http.Request) {
+
+	// Parse request body
+	var req RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode registration request", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Register the user
+	success, err := h.storage.Register(req.Name, req.Email, req.Password)
+	if h.handleStorageError(w, err, "Failed to register user") {
+		return
+	}
+
+	// Return success response
+	response := AuthResponse{
+		Success: success,
+		Message: "User registered successfully",
+	}
+
+	if err := h.writeJSONResponse(w, response); err == nil {
+		h.logger.Info("Successfully registered user with email: " + req.Email)
+	}
+}
+
+func (h *AccountHandler) Authenticate(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var req AuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode authentication request", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Authenticate the user
+	success, err := h.storage.Authenticate(req.Email, req.Password)
+	if h.handleStorageError(w, err, "Failed to authenticate user") {
+		return
+	}
+
+	// Return success response
+	response := AuthResponse{
+		Success: success,
+		Message: "User registered successfully",
+	}
+
+	if err := h.writeJSONResponse(w, response); err == nil {
+		h.logger.Info("Successfully authenticated user with email: " + req.Email)
+	}
+}
+
+
+func NewAccountHandler(storage data.AccountStorage, log *logger.Logger) *AccountHandler {
+	return &AccountHandler{
+		storage: storage,
+		logger:  log,
+	}
+}
+
+
+```
+
+Finally, we register the handlers in *main.go*
+
+```go
+	accountRepo, err := data.NewAccountRepository(db, logInstance)
+	if err != nil {
+		log.Fatalf("Failed to initialize account repository: %v", err)
+	}
+
+	// ...
+
+	accountHandler := handlers.NewAccountHandler(accountRepo, logInstance)
+	http.HandleFunc("/api/account/register/", accountHandler.Register)
+	http.HandleFunc("/api/account/authenticate/", accountHandler.Authenticate)
+
+```
+
+
+### G3 - Adding the Forms
+
+Add the new templates and populate the Web Component objects for LoginPage and RegisterPage
+
+```html
+<template id="template-register">
+        <section>
+            <h2>Register a New Account</h2>
+            <form onsubmit="app.register(event)">
+                <label for="register-name">Name</label>
+                <input type="text" id="register-name" placeholder="Name" required autocomplete="name">
+                <label for="register-email">Email</label>
+                <input type="email" id="register-email" placeholder="Email" required autocomplete="email">
+                <label for="register-password">Password</label>
+                <input type="password" id="register-password" placeholder="Password" required autocomplete="new-password">
+                <label for="register-password-confirm">Confirm Password</label>
+                <input type="password" id="register-password-confirm" placeholder="Confirm Password" required autocomplete="new-password">                 
+                <button>Register</button>
+                <p>If you already have an account, please <a href="/account/login">login</a>.</p>
+            </form>
+        </section>
+    </template>
+    <template id="template-login">
+        <section>
+            <h2>Login into Your Account</h2>
+            <form onsubmit="app.login(event)">
+                <label for="login-email">Email</label>
+                <input type="email" id="login-email" placeholder="Email" required autocomplete="email">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password">
+                <button>Log In</button>
+                <p>If you don't have an account, please <a href="/account/register">register</a>.</p>
+            </form>
+        </section>
+    </template> 
+```
+
+### G4 - Connecting the API
+
+Add to *API.js*
+
+```js
+    register: async (name, email, password) => {
+        return await API.send("account/register/", {name, email, password})
+    },
+    authenticate: async (email, password) => {
+        return await API.send("account/authenticate/", {email, password})
+    },   
+    send: async (service, args) => {
+        try {
+            const response = await fetch(API.baseURL + service, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(args)
+            });
+            const result = await response.json();
+            return result;
+        } catch (e) {
+            console.error(e);
+            app.showError();
+        }
+    },   
+
+```
+
+### G5 - Calling the APIs
+
+In *app.js* we will now add:
+
+```js
+    register: async (event) => {
+        event.preventDefault();
+        let errors = [];
+        const name = document.getElementById("register-name").value;
+        const email = document.getElementById("register-email").value;
+        const password = document.getElementById("register-password").value;
+        const passwordConfirm = document.getElementById("register-password-confirm").value;
+
+        if (name.length < 4) errors.push("Enter your complete name");
+        if (email.length < 8) errors.push("Enter your complete email");
+        if (password.length < 6) errors.push("Enter a password with 6 characters");
+        if (password != passwordConfirm) errors.push("Passwords don't match");
+        if (errors.length==0) {
+            const response = await API.register(name, email, password);
+            if (response.success) {
+                app.Router.go("/account/")
+            } else {
+                app.showError(response.message, false);
+            }        
+        } else {
+            app.showError(errors.join(". "), false);
+        }
+    },
+    login: async (event) => {
+        event.preventDefault();
+        let errors = [];
+        const email = document.getElementById("login-email").value;
+        const password = document.getElementById("login-password").value;
+ 
+        if (email.length < 8) errors.push("Enter your complete email");
+        if (password.length < 6) errors.push("Enter a password with 6 characters");
+        if (errors.length==0) {
+            const response = await API.authenticate(email, password);
+            if (response.success) {
+                app.Router.go("/account/")
+            } else {
+                app.showError(response.message, false);
+            }
+        } else {
+            app.showError(errors.join(". "), false);
+        }
+    },
+```
+
+### G6 - Sending the Token
+
+To implement JWT, we need to install a package
+
+```
+go get -u github.com/golang-jwt/jwt/v5
+```
+
+Then, we create the *token* package and inside two file. Starting with *getsecret.go*
+
+```go
+package token
+
+import (
+	"os"
+
+	"frontendmasters.com/movies/logger"
+)
+
+func GetJWTSecret(logger logger.Logger) string {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "default-secret-for-dev"
+		logger.Info("JWT_SECRET not set, using default development secret")
+	} else {
+		logger.Info("Using JWT_SECRET from environment")
+	}
+	return jwtSecret
+}
+```
+
+Then, *creation.go*
+
+```go
+package token
+
+import (
+	"time"
+
+	"frontendmasters.com/movies/logger"
+	"frontendmasters.com/movies/models"
+	"github.com/golang-jwt/jwt/v5"
+)
+
+func CreateJWT(user models.User, logger logger.Logger) string {
+	jwtSecret := GetJWTSecret(logger)
+
+	// Create a JWT token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id":    user.ID,
+		"email": user.Email,
+		"name":  user.Name,
+		"exp":   time.Now().Add(time.Hour * 72).Unix(), // Token expires in 72 hours
+	})
+
+	// Sign the token with the secret
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		logger.Error("Failed to sign JWT", err)
+		return ""
+	}
+
+	return tokenString
+}
+```
+
+And finally, *validation.go*
+
+```go
+package token
+
+import (
+	"frontendmasters.com/movies/logger"
+	"github.com/golang-jwt/jwt/v5"
+)
+
+func ValidateJWT(tokenString string, logger logger.Logger) (*jwt.Token, error) {
+	jwtSecret := GetJWTSecret(logger)
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Ensure the token's signing method is HMAC
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			logger.Error("Unexpected signing method", nil)
+			return nil, jwt.ErrTokenSignatureInvalid
+		}
+		return []byte(jwtSecret), nil
+	})
+
+	if err != nil {
+		logger.Error("Failed to validate JWT", err)
+		return nil, err
+	}
+
+	if !token.Valid {
+		logger.Error("Invalid JWT token", nil)
+		return nil, jwt.ErrTokenInvalidId
+	}
+
+	return token, nil
+}
+```
+
+Finally, we add it to our AuthResponse struct in *account_handlers.go* and return it after a successful registration or authentication.
+
+```go
+type AuthResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	JWT     string `json:"jwt"`
+}
+
+// ...
+
+// in register
+	response := AuthResponse{
+		Success: success,
+		Message: "User registered successfully",
+		JWT:     token.CreateJWT(models.User{Email: req.Email, Name: req.Name}, *h.logger),
+	}
+
+// ...
+
+// in authenticate
+	response := AuthResponse{
+		Success: success,
+		Message: "User registered successfully",
+		JWT:     token.CreateJWT(models.User{Email: req.Email}, *h.logger),
+	}
+```
+
+### G7 - Working with the Token Client-Side
+
+We first create a *services/Store.js*
+
+```js
+
+const Store = {
+    jwt: null,
+    get loggedIn() {
+        return this.jwt !== null;
+    }
+}
+
+if (localStorage.getItem("jwt")) {
+    Store.jwt = localStorage.getItem("jwt");
+}
+
+const proxiedStore = new Proxy(Store, {
+    set: (target, prop, value) => {
+        switch (prop) {
+            case "jwt":
+                target[prop] = value;
+                localStorage.setItem("jwt", value)
+                break;
+        }
+        return true;
+    }
+});
+
+
+export default proxiedStore;
+```
+
+Then, in *app.js* we save the jwt after a successful login or registration
+
+```js
+// ...
+if (response.success) {
+	app.Store.jwt = response.jwt;
+	app.Router.go("/account/")
+} else {
+	app.showError(response.message, false);
+}
+// ...			
+```
+
+Finally, we update our router, so it can detect and work with URLs needing authentication
+
+```js
+// ...
+        for (const r of routes) {
+            if (typeof r.path === "string" && r.path === routePath) {
+                pageElement = new r.component();
+                pageElement.loggedIn = r.loggedIn;
+            } else if (r.path instanceof RegExp) {
+                const match = r.path.exec(route);
+                if (match) {
+                    const params = match.slice(1);
+                    pageElement = new r.component();
+                    pageElement.loggedIn = r.loggedIn;
+
+                    pageElement.params = params;                    
+                }
+            }
+            if (pageElement) {
+                // A page was found, we checked if we have access to it.
+                if (pageElement.loggedIn && app.Store.loggedIn==false) {
+                    app.Router.go("/account/login");
+                    return;
+                }
+                break;
+            }
+        }
+// ...
+```
+
+### G8 - Creating the My Account page
+
+We start by adding a template to our *index.html*
+
+```html
+ <template id="template-account">
+	<section id="account">
+		<h2>You are Logged In</h2>
+		<button onclick="app.logout()">Log out</button>
+		<button onclick="app.Router.go('/account/favorites')">Your Favorites</button>
+		<button onclick="app.Router.go('/account/watchlist')">Your Watchlist</button>
+
+	</section>
+</template>        
+```
+
+We create the component *AccountPage.js*
+
+```js
+import API from "../services/API.js";
+import { MovieItemComponent } from "./MovieItem.js";
+
+export default class AccountPage extends HTMLElement {
+
+
+    connectedCallback() {
+        const template = document.getElementById("template-account");
+        const content = template.content.cloneNode(true);
+        this.appendChild(content);  
+    }
+}
+customElements.define("account-page", AccountPage);
+```
+
+We finally define the route in *Router.js* and implement app.logout in *main.js*
+
+```js
+// ...
+    {
+        path: "/account/",
+        component: AccountPage,
+        loggedIn: true
+    },
+// ...
+```
+
+
+
+## H-Favorites and Watchlist
+
+### H1 - Creating a middleware for authentication check
+
+At *AccountHandlers.go* add the following code:
+
+```go
+func (h *AccountHandler) AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenStr := r.Header.Get("Authorization")
+		if tokenStr == "" {
+			http.Error(w, "Missing authorization token", http.StatusUnauthorized)
+			return
+		}
+
+		// Remove "Bearer " prefix if present
+		tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
+
+		// Parse and validate the token
+
+		token, err := jwt.Parse(tokenStr,
+			func(t *jwt.Token) (interface{}, error) {
+				// Ensure the signing method is HMAC
+				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, jwt.ErrSignatureInvalid
+				}
+				return []byte(token.GetJWTSecret(*h.logger)), nil
+			},
+		)
+		if err != nil || !token.Valid {
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		// Extract claims from the token
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			http.Error(w, "Invalid token claims", http.StatusUnauthorized)
+			return
+		}
+
+		// Get the email from claims
+		email, ok := claims["email"].(string)
+		if !ok {
+			http.Error(w, "Email not found in token", http.StatusUnauthorized)
+			return
+		}
+
+		// Inject email into the request context
+		ctx := context.WithValue(r.Context(), "email", email)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+```
+
+### H2 - Adding Web Services
+
+In  *AccountHandlers.go* add the new handlers
+
+```go
+
+
+func (h *AccountHandler) SaveToCollection(w http.ResponseWriter, r *http.Request) {
+	type CollectionRequest struct {
+		MovieID    int    `json:"movie_id"`
+		Collection string `json:"collection"`
+	}
+
+	var req CollectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode collection request", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		http.Error(w, "Unable to retrieve email", http.StatusInternalServerError)
+		return
+	}
+
+	success, err := h.storage.SaveCollection(models.User{Email: email},
+		req.MovieID, req.Collection)
+	if h.handleStorageError(w, err, "Failed to save to collection") {
+		return
+	}
+
+	response := AuthResponse{
+		Success: success,
+		Message: "Movie added to " + req.Collection + " successfully",
+	}
+
+	if err := h.writeJSONResponse(w, response); err == nil {
+		h.logger.Info("Successfully saved movie to " + req.Collection)
+	}
+}
+
+func (h *AccountHandler) GetFavorites(w http.ResponseWriter, r *http.Request) {
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		http.Error(w, "Unable to retrieve email", http.StatusInternalServerError)
+		return
+	}
+	details, err := h.storage.GetAccountDetails(email)
+	if err != nil {
+		http.Error(w, "Unable to retrieve collections", http.StatusInternalServerError)
+		return
+	}
+	if err := h.writeJSONResponse(w, details.Favorites); err == nil {
+		h.logger.Info("Successfully sent favorites")
+	}
+}
+
+func (h *AccountHandler) GetWatchlist(w http.ResponseWriter, r *http.Request) {
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		http.Error(w, "Unable to retrieve email", http.StatusInternalServerError)
+		return
+	}
+	details, err := h.storage.GetAccountDetails(email)
+	if err != nil {
+		http.Error(w, "Unable to retrieve collections", http.StatusInternalServerError)
+		return
+	}
+	if err := h.writeJSONResponse(w, details.Watchlist); err == nil {
+		h.logger.Info("Successfully sent favorites")
+	}
+}
+```
+
+Then register them in *main.go*
+
+```go
+	http.Handle("/api/account/favorites/",
+		accountHandler.AuthMiddleware(http.HandlerFunc(accountHandler.GetFavorites)))
+
+	http.Handle("/api/account/watchlist/",
+		accountHandler.AuthMiddleware(http.HandlerFunc(accountHandler.GetWatchlist)))
+
+	http.Handle("/api/account/save-to-collection/",
+		accountHandler.AuthMiddleware(http.HandlerFunc(accountHandler.SaveToCollection)))
+```
+
+### H3 - Connecting with the Client
+
+We need to change *API.js* to send the token if it's available
+
+```js
+    send: async (service, args) => {
+        const response = await fetch(API.baseURL + service, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": app.Store.jwt ? `Bearer ${app.Store.jwt}` : null
+            },
+            body: JSON.stringify(args)
+        });
+        const result = await response.json();
+        return result;
+    },
+    fetch: async (service, args) => {
+        const queryString = args ? new URLSearchParams(args).toString() : "";
+        const response = await fetch(API.baseURL + service + '?' + queryString, {
+            headers: {
+                "Authorization": app.Store.jwt ? `Bearer ${app.Store.jwt}` : null
+            
+            }
+        });
+        const result = await response.json();
+        return result;
+    }
+```
+
+Then, on the same file we will add the new services:
+
+```js
+    getFavorites: async () => {
+        try {
+            return await API.fetch("account/favorites");
+        } catch (e) {
+            app.Router.go("/account/")
+        }
+    },     
+    getWatchlist: async () => {
+        try {
+            return await API.fetch("account/watchlist");
+        } catch (e) {
+            app.Router.go("/account/")
+        }
+    
+    },     
+    saveToCollection: async (movie_id, collection) => {
+        return await API.send("account/save-to-collection/", {
+            movie_id, collection
+        });
+    },
+```
+
+### H4 - Creating the New Pages
+
+Add this template to *index.html*
+
+```html
+    <template id="template-collection">
+        <section>
+            <ul id="movies-result">
+                <animated-loading data-elements="5"
+                    data-width="150px" data-height="220px">
+                </animated-loading> 
+            </ul>
+        </section>
+    </template>  
+```
+Then, create *CollectionPage.js*
+
+```js
+import { MovieItemComponent } from "./MovieItem.js";
+
+export class CollectionPage extends HTMLElement {
+
+    constructor(endpoint, title) {
+        super();
+        this.endpoint = endpoint;
+        this.title = title;   
+    }
+
+    async render() {
+        const movies = await this.endpoint()
+        const ulMovies = this.querySelector("ul");
+        ulMovies.innerHTML = "";
+        if (movies && movies.length>0) {
+            movies.forEach(movie => {
+                const li = document.createElement("li");
+                li.appendChild(new MovieItemComponent(movie));
+                ulMovies.appendChild(li);
+            });    
+        } else {
+            ulMovies.innerHTML = "<h3>There are no movies</h3>";
+        }        
+            ;
+    }
+
+    connectedCallback() {
+        const template = document.getElementById("template-collection");
+        const content = template.content.cloneNode(true);
+        this.appendChild(content);  
+
+        this.render();
+    }
+}
+```
+
+And two other components, *FavoritePage.js*
+
+```js
+import API from "../services/API.js";
+import { CollectionPage } from "./CollectionPage.js";
+
+export default class FavoritePage extends CollectionPage {
+
+    constructor() {
+        super(API.getFavorites, "Favorite Movies")
+    }
+
+}
+customElements.define("favorite-page", FavoritePage);
+```
+
+And then *WatchlistPage.js*
+
+```js
+import API from "../services/API.js";
+import { CollectionPage } from "./CollectionPage.js";
+
+export default class WatchlistPage extends CollectionPage {
+
+    constructor() {
+        super(API.getWatchlist, "Movie Watchlist")
+    }
+
+}
+customElements.define("watchlist-page", WatchlistPage);
+```
+
+And finally define the routes in *Routes.js*
+
+```js
+// ...
+
+    {
+        path: "/account/favorites",
+        component: FavoritePage,
+        loggedIn: true
+    },    
+    {
+        path: "/account/watchlist",
+        component: WatchlistPage,
+        loggedIn: true
+    }, 
+```
+
+### H5 - Adding to Collections
+
+In *app.js* lets add the new two features:
+
+```js
+    saveToCollection: async (movie_id, collection) => {
+        if (app.Store.loggedIn) {
+            try {
+                const response = await API.saveToCollection(movie_id, collection);
+                if (response.success) {
+                    switch(collection) {
+                        case "favorite":
+                            app.Router.go("/account/favorites")
+                        break;
+                        case "watchlist":
+                            app.Router.go("/account/watchlist")
+                    }
+                } else {
+                    app.showError("We couldn't save the movie.")
+                }
+            } catch (e) {
+                console.log(e)
+            }
+        } else {
+            app.Router.go("/account/");
+        }
+    }
+```	
+
+Back in *MovieDetailsPage.js*, add the following calls
+
+```js
+        this.querySelector("#btnFavorites").addEventListener("click", () => {
+            app.saveToCollection(this.movie.id, "favorite")
+        })
+        this.querySelector("#btnWatchlist").addEventListener("click", () => {
+            app.saveToCollection(this.movie.id, "watchlist")
+        })
+
 ```
