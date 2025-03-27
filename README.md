@@ -2161,7 +2161,6 @@ package token
 
 import (
 	"os"
-
 	"frontendmasters.com/movies/logger"
 )
 
@@ -2741,4 +2740,1037 @@ Back in *MovieDetailsPage.js*, add the following calls
             app.saveToCollection(this.movie.id, "watchlist")
         })
 
+```
+
+# Intermediate Course
+
+## I-Passkeys
+
+### I1 - Adding new dependences
+
+Run in the console
+
+```
+go get "github.com/go-webauthn/webauthn/webauthn"
+```
+
+### I2 - Update our models and the database
+
+Run in the database the following query:
+
+```sql
+CREATE SEQUENCE IF NOT EXISTS passkeys_id_seq;
+
+CREATE TABLE "public"."passkeys" (
+    "id" int4 NOT NULL DEFAULT nextval('passkeys_id_seq'::regclass),
+    "user_id" int4,
+    "keys" text,
+    PRIMARY KEY ("id")
+);
+```
+
+Then let's create a new model as *passkeyuser.go*
+
+```go
+package models
+
+import "github.com/go-webauthn/webauthn/webauthn"
+
+type PasskeyUser struct {
+	ID          []byte
+	DisplayName string
+	Name        string
+
+	Credentials []webauthn.Credential
+}
+
+func (u *PasskeyUser) WebAuthnID() []byte {
+	return u.ID
+}
+
+func (u *PasskeyUser) WebAuthnName() string {
+	return u.Name
+}
+
+func (u *PasskeyUser) WebAuthnDisplayName() string {
+	return u.DisplayName
+}
+
+func (u *PasskeyUser) WebAuthnCredentials() []webauthn.Credential {
+	return u.Credentials
+}
+
+func (u PasskeyUser) WebAuthnIcon() string {
+	return ""
+}
+
+func (u *PasskeyUser) PutCredential(credential webauthn.Credential) {
+	u.Credentials = append(u.Credentials, credential)
+}
+
+func (u *PasskeyUser) AddCredential(credential *webauthn.Credential) {
+	u.Credentials = append(u.Credentials, *credential)
+}
+
+func (u *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
+	for i, c := range u.Credentials {
+		if string(c.ID) == string(credential.ID) {
+			u.Credentials[i] = *credential
+		}
+	}
+}
+
+```
+
+### I3 - Create the Passkey Repository
+
+Let's update our *interfaces.go*
+
+```go
+type PasskeyStore interface {
+	GetUserByEmail(userName string) (*models.PasskeyUser, error)
+	GetUserByID(ID int) (*models.PasskeyUser, error)
+	SaveUser(models.PasskeyUser)
+	GenSessionID() (string, error)
+	GetSession(token string) (webauthn.SessionData, bool)
+	SaveSession(token string, data webauthn.SessionData)
+	DeleteSession(token string)
+}
+```
+
+Now let's create the *data/passkey_repository.go*
+
+```go
+package data
+
+import (
+	"crypto/rand"
+	"database/sql"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"strconv"
+
+	"frontendmasters.com/movies/logger"
+	"frontendmasters.com/movies/models"
+	"github.com/go-webauthn/webauthn/webauthn"
+)
+
+// PasskeyRepository manages WebAuthn passkey data using a database.
+type PasskeyRepository struct {
+	db       *sql.DB                         // Database connection
+	sessions map[string]webauthn.SessionData // In-memory session storage
+	log      logger.Logger                   // Logger for debugging and errors
+}
+
+// NewPasskeyRepository initializes a new PasskeyRepository with a database connection.
+func NewPasskeyRepository(db *sql.DB, log logger.Logger) *PasskeyRepository {
+	return &PasskeyRepository{
+		db:       db,
+		sessions: make(map[string]webauthn.SessionData),
+		log:      log,
+	}
+}
+
+// GenSessionID generates a random session ID.
+func (r *PasskeyRepository) GenSessionID() (string, error) {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// GetSession retrieves session data from the in-memory map.
+func (r *PasskeyRepository) GetSession(token string) (webauthn.SessionData, bool) {
+	r.log.Info(fmt.Sprintf("GetSession: %v", r.sessions[token]))
+	val, ok := r.sessions[token]
+	return val, ok
+}
+
+// SaveSession stores session data in the in-memory map.
+func (r *PasskeyRepository) SaveSession(token string, data webauthn.SessionData) {
+	r.log.Info(fmt.Sprintf("SaveSession: %s - %v", token, data))
+	r.sessions[token] = data
+}
+
+// DeleteSession removes session data from the in-memory map.
+func (r *PasskeyRepository) DeleteSession(token string) {
+	r.log.Info(fmt.Sprintf("DeleteSession: %v", token))
+	delete(r.sessions, token)
+}
+
+func (r *PasskeyRepository) GetUserByEmail(email string) (*models.PasskeyUser, error) {
+	r.log.Info(fmt.Sprintf("Get User: %v", email))
+
+	// Check if user exists by email
+	var userID int
+	err := r.db.QueryRow("SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+	if err == sql.ErrNoRows {
+		r.log.Error("Failed to find new user", err)
+		return nil, err
+	} else if err != nil {
+		r.log.Error("Failed to query user", err)
+		return nil, err
+	}
+
+	// Fetch user credentials from passkeys table
+	rows, err := r.db.Query("SELECT keys FROM passkeys WHERE user_id = $1", userID)
+	if err != nil {
+		r.log.Error("Failed to query passkeys", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var credentials []webauthn.Credential
+	for rows.Next() {
+		var keys string
+		if err := rows.Scan(&keys); err != nil {
+			r.log.Error("Failed to scan passkey row", err)
+			return nil, err
+		}
+		cred, err := deserializeCredential(keys)
+		if err != nil {
+			r.log.Error("Failed to deserialize credential", err)
+			continue // Skip invalid credentials
+		}
+		credentials = append(credentials, cred)
+	}
+
+	// Construct and return PasskeyUser
+	user := models.PasskeyUser{
+		ID:          []byte(strconv.Itoa(userID)), // Convert int ID to byte slice
+		Name:        email,
+		DisplayName: email,
+		Credentials: credentials,
+	}
+	return &user, nil
+}
+
+func (r *PasskeyRepository) GetUserByID(id int) (*models.PasskeyUser, error) {
+	r.log.Info(fmt.Sprintf("Get User: %v", id))
+
+	// Check if user exists by id
+	var userID int
+	err := r.db.QueryRow("SELECT id FROM users WHERE id = $1", id).Scan(&userID)
+	if err == sql.ErrNoRows {
+		r.log.Error("Failed to find new user", err)
+		return nil, err
+	} else if err != nil {
+		r.log.Error("Failed to query user", err)
+		return nil, err
+	}
+
+	// Fetch user credentials from passkeys table
+	rows, err := r.db.Query("SELECT keys FROM passkeys WHERE user_id = $1", userID)
+	if err != nil {
+		r.log.Error("Failed to query passkeys", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Fetch the email of the user
+	var email string
+	err = r.db.QueryRow("SELECT email FROM users WHERE id = $1", userID).Scan(&email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			r.log.Error("Failed to find user email", err)
+			return nil, err
+		}
+		r.log.Error("Failed to query user email", err)
+		return nil, err
+	}
+
+	var credentials []webauthn.Credential
+	for rows.Next() {
+		var keys string
+		if err := rows.Scan(&keys); err != nil {
+			r.log.Error("Failed to scan passkey row", err)
+			return nil, err
+		}
+		cred, err := deserializeCredential(keys)
+		if err != nil {
+			r.log.Error("Failed to deserialize credential", err)
+			continue // Skip invalid credentials
+		}
+		credentials = append(credentials, cred)
+	}
+
+	// Construct and return PasskeyUser
+	user := models.PasskeyUser{
+		ID:          []byte(strconv.Itoa(userID)), // Convert int ID to byte slice
+		Name:        email,
+		DisplayName: email,
+		Credentials: credentials,
+	}
+	return &user, nil
+}
+
+// SaveUser updates the user's credentials in the database.
+func (r *PasskeyRepository) SaveUser(user models.PasskeyUser) {
+	r.log.Info(fmt.Sprintf("SaveUser: %v", user.WebAuthnName()))
+
+	// Convert user ID from byte slice to integer
+	userID, err := strconv.Atoi(string(user.ID))
+	if err != nil {
+		r.log.Error("Invalid user ID", err)
+		return
+	}
+
+	// Insert new credentials
+	for _, cred := range user.Credentials {
+		keys, err := serializeCredential(cred)
+		if err != nil {
+			r.log.Error("Failed to serialize credential", err)
+			continue
+		}
+		_, err = r.db.Exec("INSERT INTO passkeys (user_id, keys) VALUES ($1, $2)", userID, keys)
+		if err != nil {
+			r.log.Error("Failed to insert passkey", err)
+		}
+	}
+}
+
+// serializeCredential converts a WebAuthn credential to a JSON string.
+func serializeCredential(cred webauthn.Credential) (string, error) {
+	data, err := json.Marshal(cred)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal credential: %w", err)
+	}
+	return string(data), nil
+}
+
+// deserializeCredential converts a JSON string back to a WebAuthn credential.
+func deserializeCredential(data string) (webauthn.Credential, error) {
+	var cred webauthn.Credential
+	err := json.Unmarshal([]byte(data), &cred)
+	if err != nil {
+		return webauthn.Credential{}, fmt.Errorf("failed to unmarshal credential: %w", err)
+	}
+	return cred, nil
+}
+
+```
+
+### I4 - Create the Passkey handlers
+
+Create *handlers/passkey_handler.go*
+
+```go
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"time"
+
+	"frontendmasters.com/movies/data"
+	"frontendmasters.com/movies/logger"
+	"frontendmasters.com/movies/models"
+	"frontendmasters.com/movies/token"
+	"github.com/go-webauthn/webauthn/webauthn"
+)
+
+type WebAuthnHandler struct {
+	storage  data.PasskeyStore
+	logger   *logger.Logger
+	webauthn *webauthn.WebAuthn
+}
+
+func NewWebAuthnHandler(storage data.PasskeyStore, logger *logger.Logger, webauthn *webauthn.WebAuthn) *WebAuthnHandler {
+	return &WebAuthnHandler{
+		storage:  storage,
+		logger:   logger,
+		webauthn: webauthn,
+	}
+}
+
+func (h *WebAuthnHandler) writeJSONResponse(w http.ResponseWriter, data interface{}) error {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		h.logger.Error("Failed to encode response", err)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return err
+	}
+	return nil
+}
+
+func (h *WebAuthnHandler) WebAuthnRegistrationBeginHandler(w http.ResponseWriter, r *http.Request) {
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		h.logger.Error("Unable to retrieve email", nil)
+		http.Error(w, "Unable to retrieve email", http.StatusInternalServerError)
+		return
+	}
+	user, err := h.storage.GetUserByEmail(email)
+	if err != nil {
+		h.logger.Error("Failed to find user", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	options, session, err := h.webauthn.BeginRegistration(user)
+	if err != nil {
+		h.logger.Error("Unable to retrieve email", err)
+		http.Error(w, "Can't begin WebAuthn Registration", http.StatusInternalServerError)
+
+		return
+	}
+
+	// Make a session key and store the sessionData values
+	t, err := h.storage.GenSessionID()
+	if err != nil {
+		h.logger.Error("Can't generate session id: %s", err)
+	}
+
+	h.storage.SaveSession(t, *session)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sid",
+		Value:    t,
+		Path:     "api/passkey/registerStart",
+		MaxAge:   3600,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	h.writeJSONResponse(w, options)
+}
+
+func (h *WebAuthnHandler) WebAuthnRegistrationEndHandler(w http.ResponseWriter, r *http.Request) {
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		h.logger.Error("Unable to retrieve email", nil)
+		http.Error(w, "Unable to retrieve email", http.StatusInternalServerError)
+		return
+	}
+
+	// Get the session key from cookie
+	sid, err := r.Cookie("sid")
+	if err != nil {
+		h.logger.Error("Couldn't get the cookie for the session", err)
+	}
+
+	// Get the session data
+	session, _ := h.storage.GetSession(sid.Value)
+
+	user, err := h.storage.GetUserByEmail(email)
+	if err != nil {
+		h.logger.Error("Failed to find user", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	credential, err := h.webauthn.FinishRegistration(user, session, r)
+	if err != nil {
+		h.logger.Error("Coudln't finish the WebAuthn Registration", err)
+		// clean up sid cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:  "sid",
+			Value: "",
+		})
+		http.Error(w, "Couldn't finish registration", http.StatusBadRequest)
+		return
+	}
+
+	// Store the credential object
+	user.AddCredential(credential)
+	h.storage.SaveUser(*user)
+	// Delete the session data
+	h.storage.DeleteSession(sid.Value)
+	http.SetCookie(w, &http.Cookie{
+		Name:  "sid",
+		Value: "",
+	})
+
+	h.writeJSONResponse(w, "{'success': true}")
+
+}
+
+func (h *WebAuthnHandler) WebAuthnAuthenticationBeginHandler(w http.ResponseWriter, r *http.Request) {
+	type CollectionRequest struct {
+		Email string `json:"email"`
+	}
+	var req CollectionRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode collection request", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	email := req.Email
+
+	h.logger.Info("Finding user " + email)
+
+	user, err := h.storage.GetUserByEmail(email) // Find the user
+
+	if err != nil {
+		h.logger.Error("Failed to find user", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	options, session, err := h.webauthn.BeginLogin(user)
+	if err != nil {
+		h.logger.Error("Coudln't start a login", err)
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Make a session key and store the sessionData values
+	t, err := h.storage.GenSessionID()
+	if err != nil {
+		h.logger.Error("Coudln't create a session ID", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	h.storage.SaveSession(t, *session)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sid",
+		Value:    t,
+		Path:     "api/passkey/loginStart",
+		MaxAge:   3600,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode, // TODO: SameSiteStrictMode maybe?
+	})
+
+	h.writeJSONResponse(w, options)
+}
+
+func (h *WebAuthnHandler) WebAuthnAuthenticationEndHandler(w http.ResponseWriter, r *http.Request) {
+	// Get the session key from cookie
+	sid, err := r.Cookie("sid")
+	if err != nil {
+		h.logger.Error("Coudln't get a session", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	// Get the session data stored from the function above
+	session, _ := h.storage.GetSession(sid.Value)
+
+	userID, err := strconv.Atoi(string(session.UserID)) // Convert []byte to int
+	if err != nil {
+		h.logger.Error("Failed to convert UserID to int", err)
+		http.Error(w, "Invalid session data", http.StatusBadRequest)
+		return
+	}
+	user, err := h.storage.GetUserByID(userID) // Get the user
+	if err != nil {
+		h.logger.Error("Failed to find user", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	credential, err := h.webauthn.FinishLogin(user, session, r)
+	if err != nil {
+		h.logger.Error("Coudln't finish login", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	// Handle credential.Authenticator.CloneWarning
+	if credential.Authenticator.CloneWarning {
+		h.logger.Error("Couldn't finish login", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	// If login was successful
+	user.UpdateCredential(credential)
+	h.storage.SaveUser(*user)
+
+	// Delete the session data
+	h.storage.DeleteSession(sid.Value)
+	http.SetCookie(w, &http.Cookie{
+		Name:  "sid",
+		Value: "",
+	})
+
+	// Add the new session cookie
+	t, err := h.storage.GenSessionID()
+	if err != nil {
+		h.logger.Error("Couldn't generate session", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+	}
+
+	h.storage.SaveSession(t, webauthn.SessionData{
+		Expires: time.Now().Add(time.Hour),
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sid",
+		Value:    t,
+		Path:     "/",
+		MaxAge:   3600,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode, // TODO: SameSiteStrictMode maybe?
+	})
+
+	type PasskeyResponse struct {
+		Success bool   `json:"success"`
+		JWT     string `json:"jwt"`
+	}
+	h.logger.Info("Sending JWT for " + user.Name)
+	// Return success response
+	response := PasskeyResponse{
+		Success: true,
+		JWT:     token.CreateJWT(models.User{Email: user.Name}, *h.logger),
+	}
+
+	h.writeJSONResponse(w, response)
+}
+
+```
+
+### I5 - Update the Main
+
+Update `main.go` to support our new handlers
+
+```go
+	// WebAuthn Handlers
+	wconfig := &webauthn.Config{
+		RPDisplayName: "ReelingIt",
+		RPID:          "localhost",
+		RPOrigins:     []string{"http://localhost:8080"},
+	}
+
+	var webAuthnManager *webauthn.WebAuthn
+
+	if webAuthnManager, err = webauthn.New(wconfig); err != nil {
+		logInstance.Error("Error creating WebAuthn", err)
+	}
+
+	if err != nil {
+		logInstance.Error("Error initialing Passkey engine", err)
+	}
+
+	passkeyRepo := data.NewPasskeyRepository(db, *logInstance)
+	webAuthnHandler := handlers.NewWebAuthnHandler(passkeyRepo, logInstance, webAuthnManager)
+	http.Handle("/api/passkey/registration-begin",
+		accountHandler.AuthMiddleware(http.HandlerFunc(webAuthnHandler.WebAuthnRegistrationBeginHandler)))
+	http.Handle("/api/passkey/registration-end",
+		accountHandler.AuthMiddleware(http.HandlerFunc(webAuthnHandler.WebAuthnRegistrationEndHandler)))
+	http.HandleFunc("/api/passkey/authentication-begin", webAuthnHandler.WebAuthnAuthenticationBeginHandler)
+	http.HandleFunc("/api/passkey/authentication-end", webAuthnHandler.WebAuthnAuthenticationEndHandler)
+
+```
+
+### I6 - Add a dependency client side
+
+In our HTML add the SimpleWebAuthn library script before app.js loading:
+
+```html
+    <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js" defer></script>
+```
+
+### I7 - Update the UI
+
+Change in *index.html* the template-account 
+
+```html
+ <template id="template-account">
+        <section id="account">
+            <h2>You are Logged In</h2>
+            <button onclick="app.logout()">Log out</button>
+            <button onclick="app.Router.go('/account/favorites')">Your Favorites</button>
+            <button onclick="app.Router.go('/account/watchlist')">Your Watchlist</button>
+            <!-- NEW -->
+            <button onclick="app.addPasskey()">Add a Passkey for faster login</button>
+        </section>
+    </template>      
+```
+
+And also the template-login removing the `required` attribute for the password:
+
+```html
+ <template id="template-login">
+        <section>
+            <h2>Login into Your Account</h2>
+            <form onsubmit="app.login(event)">
+                <label for="login-email">Email</label>
+                <input type="email" id="login-email" placeholder="Email" required autocomplete="email">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+                <button>Log In</button>
+
+                <!-- NEW -->
+                <button type="button" onclick="app.loginWithPasskey()">Log In with a Passkey</button>
+
+                <p>If you don't have an account, please <a href="/account/register">register</a>.</p>
+            </form>
+        </section>
+    </template>    
+```
+
+### I8 - Passkey Services
+
+Create a new Service *services/Passkey.js*
+
+```js
+export const Passkeys = {
+    register: async (username) => {
+        try {
+            // Get registration options with the challenge.
+            const response = await fetch('/api/passkey/registration-begin', {
+                method: 'POST', 
+                headers: {
+                    'Content-Type': 'application/json',
+                    "Authorization": app.Store.jwt ? `Bearer ${app.Store.jwt}` : null
+                },                
+                body: JSON.stringify({username: username})
+            });
+    
+            // Check if the options are ok.
+            if (!response.ok) {
+                const err = await response.json();
+                app.showError('Failed to get registration options from server.' + err)
+            }
+    
+            const options = await response.json();
+    
+            // This triggers the browser to display the passkey modal 
+            // A new public-private-key pair is created.
+            const attestationResponse = await SimpleWebAuthnBrowser.startRegistration({optionsJSON: options.publicKey});
+    
+            // Send attestationResponse back to server for verification and storage.
+            const verificationResponse = await fetch('/api/passkey/registration-end', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    "Authorization": app.Store.jwt ? `Bearer ${app.Store.jwt}` : null
+                },
+                body: JSON.stringify(attestationResponse)
+            });
+    
+            const msg = await verificationResponse.json();
+            if (verificationResponse.ok) {
+                app.showError("Your passkey was saved. You can use it next time to login")
+            } else {
+                app.showError(msg, false);
+            }
+        } catch (e) {
+            app.showError('Error: ' + e.message, false);
+        }        
+    },
+    authenticate: async (email) => {
+        try {
+            // Get login options from your server with the challenge
+            const response = await fetch('/api/passkey/authentication-begin', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email})
+            });
+            const options = await response.json();
+    
+            // This triggers the browser to display the passkey / WebAuthn modal 
+            // The challenge has been signed after this.
+            const assertionResponse = await SimpleWebAuthnBrowser.startAuthentication({optionsJSON: options.publicKey});
+    
+            // Send assertionResponse back to server for verification.
+            const verificationResponse = await fetch('/api/passkey/authentication-end', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(assertionResponse)
+            });
+    
+            const serverResponse = await verificationResponse.json();
+            if (serverResponse.success) {
+                app.Store.jwt = serverResponse.jwt;
+                app.Router.go("/account/")
+            } else {
+                app.showError(msg, false);
+            }
+        } catch (e) {
+            console.log(e)
+            app.showError('We couldn\'t authenticate you using a Passkey', false);
+        }        
+    }
+}
+```
+
+### I9 - App Controller
+
+In *app.js* add
+
+```js
+    addPasskey: async () => {
+        const username = "testuser";
+        await Passkeys.register(username);
+    },
+    loginWithPasskey: async () => {
+        const username = document.getElementById("login-email").value;
+        if (username.length < 4) {
+            app.showError("To use a passkey, enter your email address first")
+        } else {
+            await Passkeys.authenticate(username);
+        }
+    }    
+```
+
+### J-Server-Side render
+
+### J1 - Create a new handler
+
+Create *handlers/ssr_handler.go*
+
+```go
+package handlers
+
+import (
+	"errors"
+	"fmt"
+	"html"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+
+	"frontendmasters.com/movies/data"
+	"frontendmasters.com/movies/logger"
+	"frontendmasters.com/movies/models"
+)
+
+// In main.go, add this new handler function before the main function
+func SSRMovieDetailsHandler(movieRepo *data.MovieRepository, logInstance *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract movie ID from URL
+		pathParts := strings.Split(r.URL.Path, "/")
+		if len(pathParts) < 3 {
+			http.Error(w, "Movie ID required", http.StatusBadRequest)
+			return
+		}
+
+		id, err := strconv.Atoi(pathParts[2])
+		if err != nil {
+			http.Error(w, "Invalid movie ID", http.StatusBadRequest)
+			return
+		}
+
+		// Get movie from repository
+		movie, err := movieRepo.GetMovieByID(id)
+		if err != nil {
+			if errors.Is(err, data.ErrMovieNotFound) {
+				http.Error(w, "Movie not found", http.StatusNotFound)
+			} else {
+				logInstance.Error("Error fetching movie", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Serve the HTML with movie data
+		w.Header().Set("Content-Type", "text/html")
+		err = renderMovieDetails(w, movie)
+		if err != nil {
+			logInstance.Error("Error rendering movie details", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}
+}
+
+// Add this function to render the HTML
+func renderMovieDetails(w io.Writer, movie models.Movie) error {
+	// Read the index.html file
+	htmlContent, err := os.ReadFile("./public/index.html")
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+
+	// Convert movie data to HTML
+	genresHTML := ""
+	for _, genre := range movie.Genres {
+		genresHTML += fmt.Sprintf(`<li>%s</li>`, html.EscapeString(genre.Name))
+	}
+
+	castHTML := ""
+	for _, actor := range movie.Casting {
+		imageURL := "/images/generic_actor.jpg"
+		if actor.ImageURL != nil {
+			imageURL = *actor.ImageURL
+		}
+		castHTML += fmt.Sprintf(`
+            <li>
+                <img src="%s" alt="Picture of %s">
+                <p>%s %s</p>
+            </li>`,
+			html.EscapeString(imageURL),
+			html.EscapeString(actor.LastName),
+			html.EscapeString(actor.FirstName),
+			html.EscapeString(actor.LastName))
+	}
+
+	// Replace the main content
+	mainContent := fmt.Sprintf(`
+        <main>
+            <article id="movie">
+                <h2>%s</h2>
+                <h3>%s</h3>
+                <header>
+                    <img src="%s" alt="Poster">
+                    <youtube-embed id="trailer" data-url="%s"></youtube-embed>
+                    <section id="actions">
+                        <dl id="metadata">
+                            <dt>Release Date</dt>
+                            <dd>%d</dd>
+                            <dt>Score</dt>
+                            <dd>%.1f / 10</dd>
+                            <dt>Original language</dt>
+                            <dd>%s</dd>
+                        </dl>
+                        <button id="btnFavorites">Add to Favorites</button>
+                        <button id="btnWatchlist">Add to Watchlist</button>
+                    </section>
+                </header>
+                <ul id="genres">%s</ul>
+                <p id="overview">%s</p>
+                <ul id="cast">%s</ul>
+            </article>
+        </main>`,
+		html.EscapeString(movie.Title),
+		html.EscapeString(*movie.Tagline),
+		html.EscapeString(*movie.PosterURL),
+		html.EscapeString(*movie.TrailerURL),
+		movie.ReleaseYear,
+		*movie.Score,
+		html.EscapeString(*movie.Language),
+		genresHTML,
+		html.EscapeString(*movie.Overview),
+		castHTML)
+
+	// Replace the main tag content in the HTML
+	htmlStr := string(htmlContent)
+	htmlStr = strings.Replace(htmlStr, "<main></main>", mainContent, 1)
+	fmt.Println(htmlStr)
+
+	// Write the response
+	_, err = w.Write([]byte(htmlStr))
+	return err
+}
+```
+
+### J2 - Register the handler for the route
+
+At *main.go* replace the current `/movies/` handler with:
+
+```go
+http.HandleFunc("/movies/", func(w http.ResponseWriter, r *http.Request) {
+	if strings.Count(r.URL.Path, "/") == 2 && strings.HasPrefix(r.URL.Path, "/movies/") {
+		handlers.SSRMovieDetailsHandler(movieRepo, logInstance)(w, r)
+	} else {
+		catchAllHandler(w, r)
+	}
+})
+```
+
+## K-Offline
+
+### K1 - Update the Web App Manifest
+
+Add to `app.webmanifest` the `display: standalone`, `scope` and `start_url` attributes.
+
+### K2 - Create a Service Worker
+
+Create *sw.js* in the root of the public folder:
+
+```js
+// service-worker.js
+
+const CACHE_NAME = 'my-cache-v1';
+
+// Install event - precache any initial resources if needed
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(() => {
+        // Skip waiting to activate immediately
+        self.skipWaiting();
+      })
+  );
+});
+
+// Activate event - clean up old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => {
+      // Take control of clients immediately
+      return self.clients.claim();
+    })
+  );
+});
+
+// Fetch event - handle caching strategies
+self.addEventListener('fetch', (event) => {
+  const requestUrl = new URL(event.request.url);
+
+  // Handle /api/ requests (network first, cache fallback)
+  if (requestUrl.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          // Cache successful network response
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+          });
+        })
+        .catch(() => {
+          // If network fails, try cache
+          return caches.match(event.request)
+            .then((cachedResponse) => {
+              return cachedResponse || Promise.reject('No network or cache available');
+            });
+        })
+    );
+  } 
+  // Handle all other requests (stale-while-revalidate)
+  else {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.match(event.request).then((cachedResponse) => {
+          // Start fetching new version in background
+          const fetchPromise = fetch(event.request)
+            .then((networkResponse) => {
+              // Update cache with new response
+              cache.put(event.request, networkResponse.clone());
+              return networkResponse;
+            })
+            .catch((error) => {
+              console.error('Fetch failed:', error);
+            });
+
+          // Return cached version if available, otherwise wait for network
+          return cachedResponse || fetchPromise;
+        });
+      })
+    );
+  }
+});
+```
+
+### K3 - Register the Service Worker
+
+In *app.js* change the `DOMContentLoad` event with:
+
+```js
+    navigator.serviceWorker.register("/sw.js")
 ```
