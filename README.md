@@ -3025,9 +3025,22 @@ func (r *PasskeyRepository) SaveUser(user models.PasskeyUser) {
 			r.log.Error("Failed to serialize credential", err)
 			continue
 		}
-		_, err = r.db.Exec("INSERT INTO passkeys (user_id, keys) VALUES ($1, $2)", userID, keys)
+		// Check if the key already exists in the database
+		var exists bool
+		err = r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM passkeys WHERE user_id = $1 AND keys = $2)", userID, keys).Scan(&exists)
 		if err != nil {
-			r.log.Error("Failed to insert passkey", err)
+			r.log.Error("Failed to check if passkey exists", err)
+			continue
+		}
+
+		// Insert the key only if it does not already exist
+		if !exists {
+			_, err = r.db.Exec("INSERT INTO passkeys (user_id, keys) VALUES ($1, $2)", userID, keys)
+			if err != nil {
+				r.log.Error("Failed to insert passkey", err)
+			}
+		} else {
+			r.log.Info(fmt.Sprintf("Passkey already exists for user_id: %d", userID))
 		}
 	}
 }
