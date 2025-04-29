@@ -108,7 +108,6 @@ func initializeLogger() *logger.Logger {
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
-	defer logInstance.Close()
 	return logInstance
 }
 
