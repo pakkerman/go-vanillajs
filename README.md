@@ -249,8 +249,7 @@ Check instructions at [https://github.com/air-verse/air](https://github.com/air-
 go install github.com/cosmtrek/air@latest
 ```
 
-To customize it, create a *.air.toml* file with
-
+To customize it, create a *.air.toml* file. On Linux and macOS, you can use
 ```toml
 # .air.toml
 root = "."
@@ -259,6 +258,28 @@ tmp_dir = "tmp"
 [build]
 cmd = "go build -o ./tmp/main ./main.go"
 bin = "./tmp/main"
+include_ext = ["go"]  # Only watch .go files
+exclude_dir = ["tmp", "vendor", "node_modules"]
+delay = 1000  # ms
+
+[log]
+time = true
+
+[misc]
+clean_on_exit = true
+```
+
+On Windows, `cmd` & `bin` needs `.exe` after main script name, so it should be:
+
+```
+```toml
+# .air.toml
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/main.exe ./main.go"
+bin = "./tmp/main.exe"
 include_ext = ["go"]  # Only watch .go files
 exclude_dir = ["tmp", "vendor", "node_modules"]
 delay = 1000  # ms
