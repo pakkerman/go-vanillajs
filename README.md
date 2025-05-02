@@ -271,7 +271,6 @@ clean_on_exit = true
 
 On Windows, `cmd` & `bin` needs `.exe` after main script name, so it should be:
 
-```
 ```toml
 # .air.toml
 root = "."
