@@ -1,9 +1,8 @@
-# Build a Fullstack App with Vanilla JS and Go
-# Frontend Masters
-## Trainer: Maximiliano Firtman @firt (X) - firt.dev
+# Build a Fullstack App in Vanilla JS & Go Course
+This is a companion repository for the [Build a Fullstack App in Vanilla JS & Go](https://frotnendmasters.com/courses/vanilla-js-go/) course on Frontend Masters.
+[![Frontend Masters](https://static.frontendmasters.com/assets/brand/logos/full.png)](https://frotnendmasters.com/courses/vanilla-js-go/)
 
-You can follow along the workshop with instructions delivered by the trainer.
-In the assets folders, you will find a copy of the slides and the final project.
+The code snippets below are referenced throughout the course so you can either code along with Max Firtman or copy/paste. In the assets folders, you will find a copy of the slides and the final project.
 
 ## A-Backend
 
