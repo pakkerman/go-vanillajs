@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pg"
 	"github.com/pakkerman/handlers"
 	logger "github.com/pakkerman/looger"
 )
@@ -55,8 +56,7 @@ func main() {
 	fmt.Println("Server files")
 
 	const addr = ":3000"
-	err := http.ListenAndServe(addr, nil)
-	if err != nil {
+	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("Server failed: %v", err)
 		logInstance.Error("Server failed", err)
 	}
