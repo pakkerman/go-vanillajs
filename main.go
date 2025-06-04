@@ -1,10 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/pakkerman/handlers"
 	logger "github.com/pakkerman/looger"
 )
@@ -20,8 +23,28 @@ func initializeLogger() *logger.Logger {
 }
 
 func main() {
+	// Init Logger
 	logInstance := initializeLogger()
 
+	// Environment Variables
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("No env file found")
+	}
+
+	// Connect to database
+	dbConnStr := os.Getenv("DATABASE_URL")
+	if dbConnStr == "" {
+		log.Fatal("DATABASE_URL not found")
+	}
+
+	db, err := sql.Open("postgres", dbConnStr)
+	if err != nil {
+		log.Fatalf("Failed to connect to Database: %v", err)
+	}
+
+	defer db.Close()
+
+	// Init Movie handlers
 	movieHandler := handlers.MovieHandler{}
 
 	http.HandleFunc("/api/movies/top", movieHandler.GetTopMovies)
