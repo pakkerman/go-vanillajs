@@ -4,7 +4,7 @@ type Movie struct {
 	ID          int
 	TMDB_ID     int
 	Title       string
-	Tagling     string
+	Tagling     *string
 	ReleaseYear int
 	Genres      []Genre
 	Overview    *string

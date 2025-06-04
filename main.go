@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/pakkerman/handlers"
 	logger "github.com/pakkerman/looger"
 )
 
@@ -20,7 +22,13 @@ func initializeLogger() *logger.Logger {
 func main() {
 	logInstance := initializeLogger()
 
+	movieHandler := handlers.MovieHandler{}
+
+	http.HandleFunc("/api/movies/top", movieHandler.GetTopMovies)
+
+	// Handler for static files (frontend)
 	http.Handle("/", http.FileServer(http.Dir("public")))
+	fmt.Println("Server files")
 
 	const addr = ":3000"
 	err := http.ListenAndServe(addr, nil)
