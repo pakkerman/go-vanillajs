@@ -11,7 +11,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/pakkerman/data"
 	"github.com/pakkerman/handlers"
-	logger "github.com/pakkerman/looger"
+	"github.com/pakkerman/logger"
 )
 
 func initializeLogger() *logger.Logger {
@@ -54,6 +54,8 @@ func main() {
 
 	// Init Movie handlers
 	movieHandler := handlers.MovieHandler{}
+	movieHandler.Storage = movieReop
+	movieHandler.Logger = logInstance
 
 	http.HandleFunc("/api/movies/top", movieHandler.GetTopMovies)
 	http.HandleFunc("/api/movies/random", movieHandler.GetTopMovies)
