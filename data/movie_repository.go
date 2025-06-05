@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	_ "github.com/lib/pq"
-	logger "github.com/pakkerman/looger"
+	"github.com/pakkerman/logger"
 	"github.com/pakkerman/models"
 )
 

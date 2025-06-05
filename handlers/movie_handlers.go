@@ -4,18 +4,20 @@ import (
 	"encoding/json"
 	"net/http"
 
-	logger "github.com/pakkerman/looger"
+	"github.com/pakkerman/data"
+	"github.com/pakkerman/logger"
 	"github.com/pakkerman/models"
 )
 
 type MovieHandler struct {
-	logger *logger.Logger
+	Storage data.MovieStroage
+	Logger  *logger.Logger
 }
 
 func (h *MovieHandler) writeJsonResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		// TODO: log error
+		h.Logger.Error("JSON encoding error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
