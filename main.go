@@ -8,7 +8,8 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pg"
+	_ "github.com/lib/pq"
+	"github.com/pakkerman/data"
 	"github.com/pakkerman/handlers"
 	logger "github.com/pakkerman/looger"
 )
@@ -44,6 +45,12 @@ func main() {
 	}
 
 	defer db.Close()
+
+	// Init Data Repository for movies
+	movieReop, err := data.NewMovieRepository(db, logInstance)
+	if err != nil {
+		log.Fatalf("Failed to initialize movie repository: %v", err)
+	}
 
 	// Init Movie handlers
 	movieHandler := handlers.MovieHandler{}
