@@ -24,7 +24,7 @@ func (h *MovieHandler) writeJsonResponse(w http.ResponseWriter, data interface{}
 func (h *MovieHandler) GetTopMovies(w http.ResponseWriter, r *http.Request) {
 	movies, err := h.Storage.GetTopMovies()
 	if err != nil {
-		http.Error(w, "Internal Error", 500)
+		http.Error(w, "Internal Error Getting Movies", 500)
 		h.Logger.Error("GetTopMovies Error: ", err)
 	}
 	h.writeJsonResponse(w, movies)
