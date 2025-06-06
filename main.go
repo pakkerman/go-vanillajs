@@ -16,6 +16,7 @@ import (
 
 func initializeLogger() *logger.Logger {
 	logInstance, err := logger.NewLogger("movie.log")
+	logInstance.Error("hello from the logoger", nil)
 	if err != nil {
 		log.Fatalf("Failed to initialize logger %v", err)
 	}
@@ -47,18 +48,22 @@ func main() {
 	defer db.Close()
 
 	// Init Data Repository for movies
-	movieReop, err := data.NewMovieRepository(db, logInstance)
+	movieRepo, err := data.NewMovieRepository(db, logInstance)
 	if err != nil {
 		log.Fatalf("Failed to initialize movie repository: %v", err)
 	}
 
 	// Init Movie handlers
-	movieHandler := handlers.MovieHandler{}
-	movieHandler.Storage = movieReop
-	movieHandler.Logger = logInstance
+	movieHandler := handlers.NewMovieHandler(movieRepo, logInstance)
 
-	http.HandleFunc("/api/movies/top/", movieHandler.GetTopMovies)
-	http.HandleFunc("/api/movies/random/", movieHandler.GetTopMovies)
+	// Set up routers, also the ordering matters
+	http.HandleFunc("/api/movies/top", movieHandler.GetTopMovies)
+	http.HandleFunc("/api/movies/random", movieHandler.GetRandomMovies)
+	http.HandleFunc("/api/movies/search", movieHandler.SearchMovies)
+	http.HandleFunc("/api/movies/", movieHandler.GetMovie) // /api/movies/:id
+	http.HandleFunc("/api/genres", movieHandler.GetGenres)
+	http.HandleFunc("/api/account/register", movieHandler.GetGenres)
+	http.HandleFunc("/api/account/authenticate", movieHandler.GetGenres)
 
 	// Handler for static files (frontend)
 	http.Handle("/", http.FileServer(http.Dir("public")))

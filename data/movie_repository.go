@@ -5,9 +5,9 @@ import (
 	"errors"
 	"strconv"
 
-	"frontendmasters.com/movies/logger"
-	"frontendmasters.com/movies/models"
 	_ "github.com/lib/pq"
+	"github.com/pakkerman/logger"
+	"github.com/pakkerman/models"
 )
 
 type MovieRepository struct {
