@@ -1,4 +1,5 @@
 import { API } from "../services/API.js";
+import { MovieItemComponent } from "./MovieItem.js";
 
 export class HomePage extends HTMLElement {
   // <home-page>
@@ -14,7 +15,7 @@ export class HomePage extends HTMLElement {
       ul.innerHTML = "";
       movies.forEach((movie) => {
         const li = document.createElement("li");
-        li.textContent = movie.title;
+        li.appendChild(new MovieItemComponent(movie));
         ul.appendChild(li);
       });
     }
