@@ -1,28 +1,31 @@
 export const API = {
   baseURL: "/api/",
   getTopMovies: async () => {
-    return await API.fetch("movies/top/");
+    return await API.fetch("movies/top");
   },
   getRandomMovies: async () => {
-    return await API.fetch("movies/random/");
+    return await API.fetch("movies/random");
   },
-  getMovieById: async () => {
-    return await API.fetch(`movies/${id}/`);
+  getMovieById: async (id) => {
+    return await API.fetch(`/movies/${id}`);
   },
-  getMovieById: async () => {
-    return await API.fetch("movies/top/");
+  searchMovies: async (q, order, genre) => {
+    return await API.fetch(`/movies/search`, { q, order, genre });
   },
-  getMovieById: async (q, order, genre) => {
-    return await API.fetch(`movies/search/`, { q, order, genre });
+  getGenres: async () => {
+    return await API.fetch("genres");
   },
-  fetch: async (serviceName, args) => {
+  fetch: async (service, args) => {
     try {
-      const queryString = args ? new URLSearchParams(args).toString : "";
-      const response = await fetch(API.baseURL + serviceName + queryString);
+      const queryString = args ? new URLSearchParams(args).toString() : "";
+      const response = await fetch(API.baseURL + service + "?" + queryString);
       const result = await response.json();
       return result;
     } catch (e) {
       console.error(e);
+      app.showError();
     }
   },
 };
+
+export default API;

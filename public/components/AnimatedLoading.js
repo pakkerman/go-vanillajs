@@ -14,7 +14,6 @@ class AnimatedLoading extends HTMLElement {
       wrapper.style.height = height;
       wrapper.style.margin = "10px";
       wrapper.style.display = "inline-block";
-      console.log(wrapper);
       this.appendChild(wrapper);
     }
   }
