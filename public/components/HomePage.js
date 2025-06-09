@@ -1,12 +1,23 @@
-import {API} from "../services/API.js"
+import { API } from "../services/API.js";
 
 export class HomePage extends HTMLElement {
   // <home-page>
 
-  async render(){
+  async render() {
+    const topMovies = await API.getTopMovies();
+    renderMoviesInList(topMovies, document.querySelector("#top-10 ul"));
 
-    const topMovies= awiat API.getTopMovies()
+    const randomMovies = await API.getRandomMovies();
+    renderMoviesInList(randomMovies, document.querySelector("#random ul"));
 
+    function renderMoviesInList(movies, ul) {
+      ul.innerHTML = "";
+      movies.forEach((movie) => {
+        const li = document.createElement("li");
+        li.textContent = movie.title;
+        ul.appendChild(li);
+      });
+    }
   }
 
   connectedCallback() {
@@ -14,7 +25,7 @@ export class HomePage extends HTMLElement {
     const content = template.content.cloneNode(true);
     this.appendChild(content);
 
-    this.render()
+    this.render();
   }
 }
 
