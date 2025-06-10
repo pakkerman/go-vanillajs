@@ -5,6 +5,7 @@ export const Router = {
     window.addEventListener("popstate", () => {
       Router.go(location.pathname, false);
     });
+
     // enhance current links in the document
     document.querySelectorAll("a.navlink").forEach((a) =>
       a.addEventListener("click", (e) => {
