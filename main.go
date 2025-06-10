@@ -62,8 +62,16 @@ func main() {
 	http.HandleFunc("/api/movies/search", movieHandler.SearchMovies)
 	http.HandleFunc("/api/movies/", movieHandler.GetMovie) // /api/movies/:id
 	http.HandleFunc("/api/genres", movieHandler.GetGenres)
-	http.HandleFunc("/api/account/register", movieHandler.GetGenres)
-	http.HandleFunc("/api/account/authenticate", movieHandler.GetGenres)
+
+	catchAllClientRoutesHandler := func(w http.ResponseWriter, r *http.Request) {
+		// 1) HTTP Redirect 301 / 302, won't work because if you go to "/movies/14" it will send you back to "/"
+		// 2) Deliver the index.html
+		http.ServeFile(w, r, "./public/index.html")
+	}
+
+	http.HandleFunc("/movies", catchAllClientRoutesHandler)
+	http.HandleFunc("/movies/", catchAllClientRoutesHandler)
+	http.HandleFunc("/account/", catchAllClientRoutesHandler)
 
 	// Handler for static files (frontend)
 	http.Handle("/", http.FileServer(http.Dir("public")))
