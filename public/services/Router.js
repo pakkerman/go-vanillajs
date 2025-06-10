@@ -47,8 +47,22 @@ export const Router = {
       pageElement.textContent = "Page not found";
     }
 
-    // I have a page for the current URL
-    document.querySelector("main").innerHTML = "";
-    document.querySelector("main").appendChild(pageElement);
+    // Inserting new page into UI
+    const oldPage = document.querySelector("main").firstElementChild;
+    if (oldPage) oldPage.style.viewTransitionName = "old";
+    pageElement.style.viewTransitionName = "new";
+
+    if (!document.startViewTransition) {
+      updatePage();
+    } else {
+      document.startViewTransition(() => {
+        updatePage();
+      });
+    }
+
+    function updatePage() {
+      document.querySelector("main").innerHTML = "";
+      document.querySelector("main").appendChild(pageElement);
+    }
   },
 };

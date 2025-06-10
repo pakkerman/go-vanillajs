@@ -8,7 +8,7 @@
     <link rel="manifest" href="/app.webmanifest" />
     <link rel="icon" href="/images/icon.png" />
     <script src="/app.js" type="module" defer></script>
-    <base href="/" />
+    <!-- <base href="/" /> -->
   </head>
   <body>
     <header>
@@ -28,6 +28,12 @@
       </div>
     </header>
     <main></main>
+
+    <dialog id="alert-modal">
+      <h3>Error</h3>
+      <p>There was an error loading the page</p>
+      <button onclick="app.closeError()">Ok</button>
+    </dialog>
 
     <!-- templates -->
     <template id="template-home">
