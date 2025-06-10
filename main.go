@@ -61,7 +61,7 @@ func main() {
 	http.HandleFunc("/api/movies/random/", movieHandler.GetRandomMovies)
 	http.HandleFunc("/api/movies/search", movieHandler.SearchMovies)
 	http.HandleFunc("/api/movies/", movieHandler.GetMovie) // /api/movies/:id
-	http.HandleFunc("/api/genres", movieHandler.GetGenres)
+	http.HandleFunc("/api/genres/", movieHandler.GetGenres)
 
 	catchAllClientRoutesHandler := func(w http.ResponseWriter, r *http.Request) {
 		// 1) HTTP Redirect 301 / 302, won't work because if you go to "/movies/14" it will send you back to "/"
@@ -75,7 +75,7 @@ func main() {
 
 	// Handler for static files (frontend)
 	http.Handle("/", http.FileServer(http.Dir("public")))
-	fmt.Println("Server files")
+	fmt.Println("Served files")
 
 	const addr = ":3000"
 	if err := http.ListenAndServe(addr, nil); err != nil {

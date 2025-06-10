@@ -11,6 +11,7 @@ window.addEventListener("DOMContentLoaded", (event) => {
 });
 
 window.app = {
+  api: API,
   Router,
 
   search: (event) => {
@@ -19,7 +20,19 @@ window.app = {
     app.Router.go("/movies?q=" + q);
   },
 
-  api: API,
+  searchOrderChange: (order) => {
+    const urlParams = new URLSearchParams(location.search);
+    const q = urlParams.get("q");
+    const genre = urlParams.get("genre") ?? "";
+    app.Router.go(`/movies?q=${q}&order=${order}&genre=${genre}`);
+  },
+
+  searchFilterChange: (genre) => {
+    const urlParams = new URLSearchParams(location.search);
+    const q = urlParams.get("q");
+    const order = urlParams.get("order") ?? "";
+    app.Router.go(`/movies?q=${q}&order=${order}&genre=${genre}`);
+  },
 
   showError: (message = "There was an error.", goToHome = true) => {
     document.getElementById("alert-modal").showModal();
