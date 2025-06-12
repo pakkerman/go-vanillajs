@@ -53,8 +53,15 @@ func main() {
 		log.Fatalf("Failed to initialize movie repository: %v", err)
 	}
 
+	// Initialize Account Repo
+	accountRepo, err := data.NewAccountRepository(db, logInstance)
+	if err != nil {
+		log.Fatalf("Failed to initialize account repository: %v", err)
+	}
+
 	// Init Movie handlers
 	movieHandler := handlers.NewMovieHandler(movieRepo, logInstance)
+	accountHandler := handlers.NewAccountHandler(accountRepo, logInstance)
 
 	// Set up routers, also the ordering matters
 	http.HandleFunc("/api/movies/top/", movieHandler.GetTopMovies)
@@ -62,6 +69,9 @@ func main() {
 	http.HandleFunc("/api/movies/search", movieHandler.SearchMovies)
 	http.HandleFunc("/api/movies/", movieHandler.GetMovie) // /api/movies/:id
 	http.HandleFunc("/api/genres/", movieHandler.GetGenres)
+
+	http.HandleFunc("/api/account/register/", accountHandler.Register)
+	http.HandleFunc("/api/account/authenticate/", accountHandler.Authenticate)
 
 	catchAllClientRoutesHandler := func(w http.ResponseWriter, r *http.Request) {
 		// 1) HTTP Redirect 301 / 302, won't work because if you go to "/movies/14" it will send you back to "/"
