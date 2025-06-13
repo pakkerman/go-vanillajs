@@ -130,6 +130,31 @@
       </section>
     </template>
 
+    <template id="template-login">
+      <section>
+        <h2>Log in</h2>
+        <form onsubmit="app.login(event)">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" autocomplete="email" required />
+
+          <label for="login-password">Password</label>
+          <input
+            type="password"
+            id="login-password"
+            autocomplete="current-password"
+            required
+          />
+
+          <button>-Log In</button>
+
+          <p>
+            If you don&apos;t have an account, please
+            <a href="/account/register">Register</a>.
+          </p>
+        </form>
+      </section>
+    </template>
+
     <footer><p>(C) ReelingIt - FrontendMasters.com</p></footer>
   </body>
 </html>
