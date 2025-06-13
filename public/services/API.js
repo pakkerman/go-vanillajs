@@ -24,6 +24,16 @@ export const API = {
     return await API.send("account/authenticate/", { email, password });
   },
 
+  getFavorites: async () => {
+    return await API.fetch("account/favorites/");
+  },
+
+  getWatchlist: async () => {
+    return await API.fetch("account/watchlist/");
+  },
+
+  saveToCollection: async (movieId, collection) => {},
+
   send: async (service, data) => {
     const url = API.baseURL + service;
     console.log(url);
@@ -33,6 +43,7 @@ export const API = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: app.Store.jwt ? `Bearer ${app.Store.jwt}` : null,
         },
         body: JSON.stringify(data),
       });
@@ -48,11 +59,15 @@ export const API = {
     const url = API.baseURL + service + "?" + queryString;
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          Authorization: app.Store.jwt ? `Bearer ${app.Store.jwt}` : null,
+        },
+      });
       const result = await response.json();
       return result;
     } catch (e) {
-      console.error("error: ", e.message);
+      console.error(e);
     }
   },
 };

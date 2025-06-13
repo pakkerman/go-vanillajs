@@ -73,8 +73,14 @@ func main() {
 	http.HandleFunc("/api/account/register/", accountHandler.Register)
 	http.HandleFunc("/api/account/authenticate/", accountHandler.Authenticate)
 
-	http.HandleFunc("/api/account/favorites/", accountHandler.GetFavorites)
-	http.HandleFunc("/api/account/watchlist/", accountHandler.GetWatchlist)
+	http.Handle("/api/account/favorites/",
+		accountHandler.AuthMiddleware(http.HandlerFunc(accountHandler.GetFavorites)))
+
+	http.Handle("/api/account/watchlist/",
+		accountHandler.AuthMiddleware(http.HandlerFunc(accountHandler.GetWatchlist)))
+
+	http.Handle("/api/account/save-to-collection/",
+		accountHandler.AuthMiddleware(http.HandlerFunc(accountHandler.SaveToCollection)))
 
 	catchAllClientRoutesHandler := func(w http.ResponseWriter, r *http.Request) {
 		// 1) HTTP Redirect 301 / 302, won't work because if you go to "/movies/14" it will send you back to "/"
