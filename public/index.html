@@ -116,10 +116,10 @@
             required
           />
 
-          <label for="register-password-confimation"
+          <label for="register-password-confirmation"
             >Repeat your Password</label
           >
-          <input type="password" id="register-password-confimation" required />
+          <input type="password" id="register-password-confirmation" required />
           <button>Register</button>
 
           <p>
@@ -135,7 +135,13 @@
         <h2>Log in</h2>
         <form onsubmit="app.login(event)">
           <label for="login-email">Email</label>
-          <input type="email" id="login-email" autocomplete="email" required />
+          <input
+            type="email"
+            id="login-email"
+            autocomplete="email"
+            required
+            value="test@test.dev"
+          />
 
           <label for="login-password">Password</label>
           <input
@@ -145,7 +151,7 @@
             required
           />
 
-          <button>-Log In</button>
+          <button>Log In</button>
 
           <p>
             If you don&apos;t have an account, please

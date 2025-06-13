@@ -15,18 +15,43 @@ export const API = {
   searchMovies: async (q, order, genre) => {
     return await API.fetch(`movies/search`, { q, order, genre });
   },
+
+  register: async (name, email, password) => {
+    return await API.send("account/register/", { name, email, password });
+  },
+
+  login: async (email, password) => {
+    return await API.send("account/authenticate/", { email, password });
+  },
+
+  send: async (service, data) => {
+    const url = API.baseURL + service;
+    console.log(url);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      const result = await response.json();
+      return result;
+    } catch (e) {
+      app.showError(e);
+    }
+  },
+
   fetch: async (service, args) => {
     const queryString = args ? new URLSearchParams(args).toString() : "";
     const url = API.baseURL + service + "?" + queryString;
 
     try {
       const response = await fetch(url);
-      console.log(API.baseURL + service + "?" + queryString);
       const result = await response.json();
-      console.log(result);
       return result;
     } catch (e) {
-      console.error("url: ", url);
       console.error("error: ", e.message);
     }
   },
