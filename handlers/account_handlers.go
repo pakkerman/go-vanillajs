@@ -6,6 +6,8 @@ import (
 
 	"github.com/pakkerman/data"
 	"github.com/pakkerman/logger"
+	"github.com/pakkerman/models"
+	"github.com/pakkerman/token"
 )
 
 // define request structure
@@ -24,6 +26,7 @@ type AuthRequest struct {
 type AuthResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
+	JWT     string `json:"jwt"`
 }
 
 type AccountHandler struct {
@@ -80,6 +83,7 @@ func (h *AccountHandler) Register(w http.ResponseWriter, r *http.Request) {
 	response := AuthResponse{
 		Success: success,
 		Message: "User registration complete",
+		JWT:     token.CreateJWT(models.User{Email: req.Email, Name: req.Name}, *h.logger),
 	}
 
 	if err := h.writeJSONResponse(w, response); err == nil {
@@ -105,6 +109,7 @@ func (h *AccountHandler) Authenticate(w http.ResponseWriter, r *http.Request) {
 	response := AuthResponse{
 		Success: success,
 		Message: "User authentication compolete",
+		JWT:     token.CreateJWT(models.User{Email: req.Email}, *h.logger),
 	}
 
 	if err := h.writeJSONResponse(w, response); err == nil {
