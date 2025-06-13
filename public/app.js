@@ -1,17 +1,20 @@
 import { API } from "./services/API.js";
 import { Router } from "./services/Router.js";
+import Store from "./services/Store.js";
 
 import "./components/HomePage.js";
 import "./components/MovieDetailsPage.js";
 import "./components/AnimatedLoading.js";
 import "./components/YouTubeEmbed.js";
+import "./components/AccountPage.js";
 
-window.addEventListener("DOMContentLoaded", (event) => {
+window.addEventListener("DOMContentLoaded", () => {
   app.Router.init();
 });
 
 window.app = {
   api: API,
+  Store,
   Router,
 
   search: (event) => {
@@ -69,6 +72,7 @@ window.app = {
 
     const response = await API.register(name, email, password);
     if (response.success) {
+      app.Store.jwt = response.jwt;
       app.Router.go("/account/");
     } else {
       app.showError(response.message);
@@ -93,9 +97,15 @@ window.app = {
 
     const response = await API.login(email, password);
     if (response.success) {
+      app.Store.jwt = response.jwt;
       app.Router.go("/account/");
     } else {
       app.showError(response.message);
     }
+  },
+
+  logout: () => {
+    Store.jwt = null;
+    app.Router.go("/");
   },
 };
