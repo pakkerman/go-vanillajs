@@ -71,6 +71,7 @@ func main() {
 
 	http.HandleFunc("/api/account/register/", accountHandler.Register)
 	http.HandleFunc("/api/account/authenticate/", accountHandler.Authenticate)
+	http.HandleFunc("/api/account/delete/", accountHandler.Delete)
 
 	http.Handle("/api/account/favorites/",
 		accountHandler.AuthMiddleware(http.HandlerFunc(accountHandler.GetFavorites)))

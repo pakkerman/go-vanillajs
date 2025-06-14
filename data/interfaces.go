@@ -13,6 +13,7 @@ type MovieStroage interface {
 type AccountStorage interface {
 	Authenticate(string, string) (bool, error)
 	Register(string, string, string) (bool, error)
+	Delete(string, string) (bool, error)
 	GetAccountDetails(string) (models.User, error)
 	SaveCollection(models.User, int, string) (bool, error)
 }

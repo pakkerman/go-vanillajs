@@ -120,6 +120,31 @@ func (h *AccountHandler) Authenticate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	var req AuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode delete request", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// delete user
+	success, err := h.storage.Delete(req.Email, req.Password)
+	if h.handleStorageError(w, err, "Failed to delete user") {
+		return
+	}
+
+	// return success response
+	response := AuthResponse{
+		Success: success,
+		Message: "User deletion compolete",
+	}
+
+	if err := h.writeJSONResponse(w, response); err == nil {
+		h.logger.Info("Successfully deleted user with email: " + req.Email)
+	}
+}
+
 func NewAccountHandler(storage data.AccountStorage, log *logger.Logger) *AccountHandler {
 	return &AccountHandler{
 		storage: storage,

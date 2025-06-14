@@ -105,8 +105,24 @@ window.app = {
   },
 
   logout: () => {
-    Store.jwt = null;
+    app.Store.jwt = null;
     app.Router.go("/");
+  },
+
+  deleteAccount: async (event) => {
+    event.preventDefault();
+    const email = "test@test.dev";
+    const password = "123123";
+
+    const response = await API.deleteUser(email, password);
+    if (response.success) {
+      app.Store.jwt = null;
+      app.Router.go("/");
+
+      app.showModal("Account deletion complete");
+    } else {
+      app.showError(response.message);
+    }
   },
 
   saveToCollection: async (movie_id, collection) => {

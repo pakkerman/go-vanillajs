@@ -124,6 +124,56 @@ func (r *AccountRepository) Authenticate(email string, password string) (bool, e
 	return true, nil
 }
 
+func (r *AccountRepository) Delete(email string, password string) (bool, error) {
+	if email == "" || password == "" {
+		r.logger.Error("Authentication validation failed: missing credentials", nil)
+		return false, ErrAuthenticationValidation
+	}
+
+	// Fetch user by email
+	var user models.User
+	query := `
+      SELECT id, name, email, password_hashed
+      FROM users
+      WHERE email = $1 AND time_deleted IS NULL
+    `
+	err := r.db.QueryRow(query, email).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Password,
+	)
+	if err == sql.ErrNoRows {
+		r.logger.Error("User not found for email: "+email, nil)
+		return false, ErrAuthenticationValidation
+	}
+	if err != nil {
+		r.logger.Error("Failed to query user for authentication", err)
+		return false, err
+	}
+
+	// Verify password
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		r.logger.Error("Password mismatch for email: "+email, nil)
+		return false, ErrAuthenticationValidation
+	}
+
+	// Update time_deleted
+	updateQuery := `
+      UPDATE users
+      SET time_deleted = $1
+      WHERE id = $2
+    `
+	_, err = r.db.Exec(updateQuery, time.Now(), user.ID)
+	if err != nil {
+		r.logger.Error("Failed to delete user by setting time_deleted", err)
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (r *AccountRepository) GetAccountDetails(email string) (models.User, error) {
 	var user models.User
 	query := `

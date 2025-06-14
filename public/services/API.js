@@ -24,6 +24,10 @@ export const API = {
     return await API.send("account/authenticate/", { email, password });
   },
 
+  deleteUser: async (email, password) => {
+    return await API.send("account/delete/", { email, password });
+  },
+
   getFavorites: async () => {
     return await API.fetch("account/favorites/");
   },
