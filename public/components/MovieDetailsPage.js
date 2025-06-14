@@ -22,13 +22,13 @@ export class MovieDetailsPage extends HTMLElement {
     this.querySelector("#trailer").dataset.url = this.movie.trailer_url;
     this.querySelector("#overview").textContent = this.movie.overview;
     this.querySelector("#metadata").innerHTML = `
-<dt>Release Year</dt>
-<dd>${this.movie.release_year}</dd>
-<dt>Score</dt>
-<dd>${this.movie.score} / 10</dd>
-<dt>Popularity</dt>
-<dd>${this.movie.popularity}</dd>
-`;
+      <dt>Release Year</dt>
+      <dd>${this.movie.release_year}</dd>
+      <dt>Score</dt>
+      <dd>${this.movie.score} / 10</dd>
+      <dt>Popularity</dt>
+      <dd>${this.movie.popularity}</dd>
+    `;
 
     const ulGenres = this.querySelector("#genres");
     ulGenres.innerHTML = "";
@@ -37,6 +37,19 @@ export class MovieDetailsPage extends HTMLElement {
       li.textContent = genre.name;
       ulGenres.appendChild(li);
     });
+
+    this.querySelector("#actions #btnFavorites").addEventListener(
+      "click",
+      () => {
+        app.saveToCollection(this.movie.id, "favorite");
+      },
+    );
+    this.querySelector("#actions #btnWatchlist").addEventListener(
+      "click",
+      () => {
+        app.saveToCollection(this.movie.id, "watchlist");
+      },
+    );
 
     const ulCast = this.querySelector("#cast");
     ulCast.innerHTML = "";

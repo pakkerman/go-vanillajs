@@ -56,8 +56,8 @@
           <youtube-embed id="trailer">YouTube Loading...</youtube-embed>
           <section id="actions">
             <dl id="metadata"></dl>
-            <button>Add to Favorites</button>
-            <button>Add to Watchlist</button>
+            <button id="btnFavorites">Add to Favorites</button>
+            <button id="btnWatchlist">Add to Watchlist</button>
           </section>
         </header>
         <ul id="genres"></ul>
@@ -166,10 +166,10 @@
         <h2>You are Logged In</h2>
 
         <button onclick="app.logout()">Log out</button>
-        <button onclick="app.Router.go('account/favorites')">
+        <button onclick="app.Router.go('/account/favorites')">
           Your Favorites
         </button>
-        <button onclick="app.Router.go('account/watchlist')">
+        <button onclick="app.Router.go('/account/watchlist')">
           Your Watchlist
         </button>
       </section>
@@ -178,9 +178,9 @@
     <template id="template-collection">
       <section>
         <h2></h2>
-        <ul id="movies">
+        <ul id="movies-result">
           <animated-loading
-            date-elements="5"
+            data-elements="5"
             data-width="150px"
             data-height="220px"
           ></animated-loading>

@@ -16,7 +16,6 @@ import (
 
 func initializeLogger() *logger.Logger {
 	logInstance, err := logger.NewLogger("movie.log")
-	logInstance.Error("hello from the logoger", nil)
 	if err != nil {
 		log.Fatalf("Failed to initialize logger %v", err)
 	}

@@ -32,7 +32,9 @@ export const API = {
     return await API.fetch("account/watchlist/");
   },
 
-  saveToCollection: async (movieId, collection) => {},
+  saveToCollection: async (movie_id, collection) => {
+    return API.send("account/save-to-collection/", { movie_id, collection });
+  },
 
   send: async (service, data) => {
     const url = API.baseURL + service;
