@@ -40,6 +40,7 @@ window.app = {
   showError: (message = "There was an error.", goToHome = false) => {
     document.getElementById("alert-modal").showModal();
     document.querySelector("#alert-modal p").textContent = message;
+
     if (goToHome) app.Router.go("/");
   },
 
@@ -80,6 +81,7 @@ window.app = {
 
     if (response.success) {
       app.Store.jwt = response.jwt;
+      app.Store.email = email;
       app.Router.go("/account/");
     } else {
       app.showError(response.message);
@@ -112,6 +114,7 @@ window.app = {
 
     if (response.success) {
       app.Store.jwt = response.jwt;
+      app.Store.email = email;
       app.Router.go("/account/");
     } else {
       app.showError("something wrong with loggin in");
@@ -120,20 +123,35 @@ window.app = {
 
   logout: () => {
     app.Store.jwt = null;
+    app.Store.email = null;
+
     app.Router.go("/");
   },
 
   deleteAccount: async (event) => {
     event.preventDefault();
-    const email = "test@test.dev";
-    const password = "123123";
+
+    const email = app.Store.email;
+    const password = document.getElementById("deletion-password").value;
 
     const response = await API.deleteUser(email, password);
+    if (!response) {
+      app.showError("please check if the password is correct.");
+      return;
+    }
+
     if (response.success) {
       app.Store.jwt = null;
-      app.Router.go("/");
+      app.Store.email = null;
 
-      app.showModal("Account deletion complete");
+      app.showError(
+        "Account deletion complete, you will be redirect to the homepage.",
+      );
+
+      setTimeout(() => {
+        app.closeError();
+        app.Router.go("/");
+      }, 3000);
     } else {
       app.showError(response.message);
     }
@@ -155,7 +173,7 @@ window.app = {
           app.showError("We couldn't save the movie.");
         }
       } catch (e) {
-        console.log(e);
+        console.error(e);
       }
     } else {
       app.Router.go("/account/");

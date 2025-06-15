@@ -23,6 +23,11 @@
 body {
   background-color: var(--background-surface);
   color: #fff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
 }
 
 a {
@@ -472,4 +477,3 @@ input[type="email"] {
     margin: auto;
   }
 }
-

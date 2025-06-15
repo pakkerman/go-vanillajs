@@ -163,7 +163,7 @@
 
     <template id="template-account">
       <section id="account">
-        <h2>You are Logged In</h2>
+        <h2>You are Logged In as <span></span></h2>
 
         <button onclick="app.logout()">Log out</button>
         <button onclick="app.Router.go('/account/favorites')">
@@ -172,7 +172,32 @@
         <button onclick="app.Router.go('/account/watchlist')">
           Your Watchlist
         </button>
-        <button onclick="app.deleteAccount(event)">Delete Account</button>
+        <button
+          onclick="app.Router.go('/account/delete')"
+          style="background-color: red"
+        >
+          Delete Account
+        </button>
+      </section>
+    </template>
+
+    <template id="template-delete">
+      <section id="delete">
+        <h2>Account Deletion</h2>
+
+        <form onsubmit="app.deleteAccount(event)">
+          <h3 id="email"></h3>
+          <label for="deletion-password">Re-enter your password</label>
+          <input
+            type="password"
+            id="deletion-password"
+            autocomplete="disabled"
+            required
+          />
+          <button style="background-color: red">Delete Account</button>
+        </form>
+        <br />
+        <button onclick="app.logout()">Log out</button>
       </section>
     </template>
 
