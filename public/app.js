@@ -71,6 +71,13 @@ window.app = {
     }
 
     const response = await API.register(name, email, password);
+    if (!response) {
+      app.showError(
+        "Incorrect email or password, please check again, or register an account.",
+      );
+      return;
+    }
+
     if (response.success) {
       app.Store.jwt = response.jwt;
       app.Router.go("/account/");
@@ -96,11 +103,18 @@ window.app = {
     }
 
     const response = await API.login(email, password);
+    if (!response) {
+      app.showError(
+        "Incorrect email or password, please check again, or register an account.",
+      );
+      return;
+    }
+
     if (response.success) {
       app.Store.jwt = response.jwt;
       app.Router.go("/account/");
     } else {
-      app.showError(response.message);
+      app.showError("something wrong with loggin in");
     }
   },
 

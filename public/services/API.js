@@ -53,6 +53,7 @@ export const API = {
         },
         body: JSON.stringify(data),
       });
+
       const result = await response.json();
       return result;
     } catch (e) {
