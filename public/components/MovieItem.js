@@ -4,13 +4,12 @@ export class MovieItem extends HTMLElement {
   constructor(movie) {
     super(); // override the default constructor, so super needs to be called again
     this.movie = movie;
-    this.favorited = store.collection.Favorites.some(
-      (item) => item.id === this.movie.id,
+    this.isFavorited = store.collection.favorites.some(
+      (id) => id === this.movie.id,
     );
-    this.watchlisted = store.collection.Watchlist.some(
-      (item) => item.id === this.movie.id,
+    this.isWatchlisted = store.collection.watchlist.some(
+      (id) => id === this.movie.id,
     );
-    console.log(this.favorited, this.watrchlisted);
   }
 
   connectedCallback() {
@@ -27,7 +26,10 @@ export class MovieItem extends HTMLElement {
           <p>${this.movie.title} (${this.movie.release_year})</p>
         </article>
       </a>
-      <div class="icon ${this.favorited ? "icon-heart-full" : "icon-heart-empty"}"  />
+      <div class="icon-wrapper">
+        <div class="icon ${this.isFavorited ? "icon-heart-full" : "hidden"}"></div>
+        <div class="icon ${this.isWatchlisted ? "icon-eye-full" : "hidden"}"></div>
+      </div>
     </div>
     `;
   }

@@ -1,9 +1,8 @@
 import { API } from "../services/API.js";
 import { MovieItem } from "./MovieItem.js";
 
+// <home-page>
 export class HomePage extends HTMLElement {
-  // <home-page>
-
   async render() {
     const topMovies = await API.getTopMovies();
     renderMoviesInList(topMovies, document.querySelector("#top-10 ul"));

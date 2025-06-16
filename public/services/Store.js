@@ -45,7 +45,12 @@ const proxiedStore = new Proxy(Store, {
         target[prop] = value;
         if (value == null) localStorage.removeItem("collection");
         else {
-          localStorage.setItem("collection", JSON.stringify(value));
+          const collection = {
+            favorites: value.Favorites.map((item) => item.id),
+            watchlist: value.Watchlist.map((item) => item.id),
+          };
+
+          localStorage.setItem("collection", JSON.stringify(collection));
         }
         break;
     }

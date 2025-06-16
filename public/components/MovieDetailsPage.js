@@ -4,7 +4,6 @@ import store from "../services/Store.js";
 export class MovieDetailsPage extends HTMLElement {
   movie = null;
   id = null;
-  collection = store.collection;
 
   async render() {
     try {
@@ -50,17 +49,12 @@ export class MovieDetailsPage extends HTMLElement {
       app.saveToCollection(this.movie.id, "watchlist");
     });
 
-    this.collection.Favorites.forEach((item) => {
-      if (item.id === this.movie.id) {
-        favoriteBtn.disabled = true;
-      }
-    });
-
-    this.collection.Watchlist.forEach((item) => {
-      if (item.id === this.movie.id) {
-        watchlistBtn.disabled = true;
-      }
-    });
+    favoriteBtn.disabled = store.collection.favorites.some(
+      (id) => id === this.id,
+    );
+    watchlistBtn.disabled = store.collection.watchlist.some(
+      (id) => id === this.id,
+    );
 
     const ulCast = this.querySelector("#cast");
     ulCast.innerHTML = "";
