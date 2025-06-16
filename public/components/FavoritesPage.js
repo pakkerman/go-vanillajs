@@ -3,7 +3,7 @@ import { CollectionPage } from "./CollectionPage.js";
 
 export class FavoritesPage extends CollectionPage {
   constructor() {
-    super(API.getFavorites, "Favorite Movies");
+    super(API.getFavorites, "Favorite Movies", "favorites");
   }
 }
 

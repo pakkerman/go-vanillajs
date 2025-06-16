@@ -1,8 +1,10 @@
 import { API } from "../services/API.js";
+import store from "../services/Store.js";
 
 export class MovieDetailsPage extends HTMLElement {
   movie = null;
   id = null;
+  collection = store.collection;
 
   async render() {
     try {
@@ -38,18 +40,27 @@ export class MovieDetailsPage extends HTMLElement {
       ulGenres.appendChild(li);
     });
 
-    this.querySelector("#actions #btnFavorites").addEventListener(
-      "click",
-      () => {
-        app.saveToCollection(this.movie.id, "favorite");
-      },
-    );
-    this.querySelector("#actions #btnWatchlist").addEventListener(
-      "click",
-      () => {
-        app.saveToCollection(this.movie.id, "watchlist");
-      },
-    );
+    const favoriteBtn = this.querySelector("#actions #btnFavorites");
+    const watchlistBtn = this.querySelector("#actions #btnWatchlist");
+
+    favoriteBtn.addEventListener("click", () => {
+      app.saveToCollection(this.movie.id, "favorite");
+    });
+    watchlistBtn.addEventListener("click", () => {
+      app.saveToCollection(this.movie.id, "watchlist");
+    });
+
+    this.collection.Favorites.forEach((item) => {
+      if (item.id === this.movie.id) {
+        favoriteBtn.disabled = true;
+      }
+    });
+
+    this.collection.Watchlist.forEach((item) => {
+      if (item.id === this.movie.id) {
+        watchlistBtn.disabled = true;
+      }
+    });
 
     const ulCast = this.querySelector("#cast");
     ulCast.innerHTML = "";

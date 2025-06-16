@@ -1,14 +1,17 @@
+import store from "../services/Store.js";
 import { MovieItem } from "./MovieItem.js";
 
 export class CollectionPage extends HTMLElement {
-  constructor(endpoint, title) {
+  constructor(endpoint, title, collection) {
     super();
     this.endpoint = endpoint;
-    this.title = title;
+    this.pageTitle = title;
+    this.collection = store.collection;
   }
 
   async render() {
     const movies = await this.endpoint();
+
     const ulMovies = this.querySelector("ul");
     ulMovies.innerHTML = "";
     if (movies && movies.length > 0) {

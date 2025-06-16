@@ -114,6 +114,7 @@ window.app = {
 
     if (response.success) {
       app.Store.jwt = response.jwt;
+      app.Store.collection = response.collection;
       app.Store.email = email;
       app.Router.go("/account/");
     } else {
@@ -122,9 +123,7 @@ window.app = {
   },
 
   logout: () => {
-    app.Store.jwt = null;
-    app.Store.email = null;
-
+    app.Store.clear();
     app.Router.go("/");
   },
 
@@ -141,9 +140,7 @@ window.app = {
     }
 
     if (response.success) {
-      app.Store.jwt = null;
-      app.Store.email = null;
-
+      app.Store.clear();
       app.showError(
         "Account deletion complete, you will be redirect to the homepage.",
       );

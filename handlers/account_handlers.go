@@ -27,9 +27,15 @@ type AuthRequest struct {
 }
 
 type AuthResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	JWT     string `json:"jwt"`
+	Success    bool       `json:"success"`
+	Message    string     `json:"message"`
+	JWT        string     `json:"jwt"`
+	Collection Collection `json:"collection"`
+}
+
+type Collection struct {
+	Favorites []models.Movie
+	Watchlist []models.Movie
 }
 
 type AccountHandler struct {
@@ -108,11 +114,20 @@ func (h *AccountHandler) Authenticate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	details, err := h.storage.GetAccountDetails(req.Email)
+	if err != nil {
+		h.logger.Info("Error getting user collections from account details")
+	}
+
 	// return success response
 	response := AuthResponse{
 		Success: success,
 		Message: "User authentication compolete",
 		JWT:     token.CreateJWT(models.User{Email: req.Email}, *h.logger),
+		Collection: Collection{
+			Favorites: details.Favorites,
+			Watchlist: details.Watchlist,
+		},
 	}
 
 	if err := h.writeJSONResponse(w, response); err == nil {

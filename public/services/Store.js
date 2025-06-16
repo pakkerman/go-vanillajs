@@ -1,20 +1,28 @@
 const Store = {
   email: "",
   jwt: null,
+  collection: {},
+
   get loggedIn() {
     return this.jwt !== null;
   },
 
-  reset: () => {
+  clear: () => {
+    Store.jwt = null;
     Store.email = "";
+    Store.collection = {};
+
+    localStorage.clear();
   },
 };
 
 const jwt = localStorage.getItem("jwt");
 const email = localStorage.getItem("email");
+const collection = localStorage.getItem("collection");
 
 if (jwt) Store.jwt = jwt;
 if (email) Store.email = email;
+if (collection) Store.collection = JSON.parse(collection);
 
 // so this will hook event when something happens to Store
 
@@ -32,6 +40,14 @@ const proxiedStore = new Proxy(Store, {
         target[prop] = value;
         if (value == null) localStorage.removeItem("email");
         else localStorage.setItem("email", value);
+        break;
+      case "collection":
+        target[prop] = value;
+        if (value == null) localStorage.removeItem("collection");
+        else {
+          localStorage.setItem("collection", JSON.stringify(value));
+        }
+        break;
     }
 
     return true;

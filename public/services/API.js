@@ -42,18 +42,21 @@ export const API = {
 
   send: async (service, data) => {
     const url = API.baseURL + service;
-    console.log(url);
+    const token = app.Store.jwt ? `Bearer ${app.Store.jwt}` : null;
+
+    console.log(url, { ...data, token: token });
 
     try {
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: app.Store.jwt ? `Bearer ${app.Store.jwt}` : null,
+          Authorization: token,
         },
         body: JSON.stringify(data),
       });
 
+      console.log(response);
       const result = await response.json();
       return result;
     } catch (e) {

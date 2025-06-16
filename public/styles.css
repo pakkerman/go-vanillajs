@@ -325,6 +325,11 @@ button {
   margin: 0.5rem;
 }
 
+button:disabled {
+  background-color: gray;
+  cursor: default;
+}
+
 button:hover {
   opacity: 0.9;
 }
@@ -476,4 +481,34 @@ input[type="email"] {
   input[type="search"] {
     margin: auto;
   }
+}
+
+div.icon {
+  height: 16px;
+  width: 16px;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+
+  transition: all;
+  transition-duration: 300ms;
+}
+
+div.icon-heart {
+  background-image: url("/images/heart_empty.svg");
+  color: gray;
+}
+
+div.icon-heart-empty {
+  background-image: url("/images/heart_empty.svg");
+  color: gray;
+}
+
+div.icon-heart-full {
+  background-image: url("/images/heart_full.svg");
+  color: red;
+}
+
+div.icon:hover {
+  color: red;
 }
