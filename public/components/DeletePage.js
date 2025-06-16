@@ -6,6 +6,8 @@ export class DeletePage extends HTMLElement {
     const content = template.content.cloneNode(true);
     content.querySelector("#email").textContent = `Deleting ${store.email}`;
     this.appendChild(content);
+
+    document.querySelector("input#deletion-password").focus();
   }
 }
 
