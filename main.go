@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/pakkerman/data"
@@ -82,6 +83,37 @@ func main() {
 	http.Handle("/api/account/save-to-collection/",
 		accountHandler.AuthMiddleware(http.HandlerFunc(accountHandler.SaveToCollection)))
 
+	// Web Authentication - Passkeys
+	wconfig := &webauthn.Config{
+		RPDisplayName: "ReelingIt", // RP stands for relying party
+		RPID:          "localhost",
+		RPOrigins:     []string{"http://localhost:3000"},
+	}
+
+	var webAuthnManager *webauthn.WebAuthn
+	if webAuthnManager, err = webauthn.New(wconfig); err != nil {
+		logInstance.Error("Error creating WebAuthn", err)
+	}
+
+	if err != nil {
+		logInstance.Error("Error creating WebAuthn", err)
+	}
+
+	passkeyRepo := data.NewPasskeyRepository(db, *logInstance)
+	webAuthnHandler := handlers.NewWebAuthnHandler(passkeyRepo, logInstance, webAuthnManager)
+	// Needs User authentication for passkey registration
+	http.Handle("/api/passkey/registration-begin",
+		accountHandler.AuthMiddleware(http.HandlerFunc(webAuthnHandler.WebAuthnRegistrationBeginHandler)))
+	http.Handle("/api/passkey/registration-end",
+		accountHandler.AuthMiddleware(http.HandlerFunc(webAuthnHandler.WebAuthnRegistrationEndHandler)))
+
+	// No need for user authentication (no middleware)
+	http.HandleFunc("/api/passkey/authentication-begin",
+		webAuthnHandler.WebAuthnAuthenticationBeginHandler)
+	http.HandleFunc("/api/passkey/authentication-end",
+		webAuthnHandler.WebAuthnAuthenticationEndHandler)
+
+	// catch all
 	catchAllClientRoutesHandler := func(w http.ResponseWriter, r *http.Request) {
 		// 1) HTTP Redirect 301 / 302, won't work because if you go to "/movies/14" it will send you back to "/"
 		// 2) Deliver the index.html

@@ -1,6 +1,7 @@
 import { API } from "./services/API.js";
 import { Router } from "./services/Router.js";
 import Store from "./services/Store.js";
+import Passkeys from "./services/Passkey.js";
 
 import "./components/HomePage.js";
 import "./components/MovieDetailsPage.js";
@@ -125,6 +126,21 @@ window.app = {
   logout: () => {
     app.Store.clear();
     app.Router.go("/");
+  },
+
+  addNewPasskey: async () => {
+    console.log("loginWithPasskey fired");
+    const username = "testuser";
+    await Passkeys.register(username);
+  },
+
+  loginWithPasskey: async () => {
+    const username = document.getElementById("login-email").value;
+    if (username.length < 4) {
+      app.showError("To use a passkey, enter your email first");
+    } else {
+      await Passkeys.authenticate(username);
+    }
   },
 
   deleteAccount: async (event) => {

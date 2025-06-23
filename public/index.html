@@ -3,12 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
     <title>ReelingIt - Movies</title>
     <link rel="stylesheet" href="/styles.css" />
     <link rel="manifest" href="/app.webmanifest" />
     <link rel="icon" href="/images/icon.png" />
+    <!-- loading the lib first     -->
+    <script
+      src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"
+      defer
+    ></script>
     <script src="/app.js" type="module" defer></script>
-    <base href="/" />
   </head>
   <body>
     <header>
@@ -138,8 +143,8 @@
           <input
             type="email"
             id="login-email"
-            autocomplete="email"
             required
+            autocomplete="email webauthn"
             value="test@test.dev"
           />
 
@@ -153,6 +158,10 @@
 
           <button>Log In</button>
 
+          <button type="button" onclick="app.loginWithPasskey()">
+            Login with Passkey
+          </button>
+
           <p>
             If you don&apos;t have an account, please
             <a href="/account/register">Register</a>.
@@ -165,19 +174,28 @@
       <section id="account">
         <h2>You are Logged In as <span></span></h2>
 
-        <button onclick="app.logout()">Log out</button>
-        <button onclick="app.Router.go('/account/favorites')">
-          Your Favorites
-        </button>
-        <button onclick="app.Router.go('/account/watchlist')">
-          Your Watchlist
-        </button>
-        <button
-          onclick="app.Router.go('/account/delete')"
-          style="background-color: red"
-        >
-          Delete Account
-        </button>
+        <div class="">
+          <button onclick="app.logout()">Log out</button>
+          <button onclick="app.Router.go('/account/favorites')">
+            Your Favorites
+          </button>
+          <button onclick="app.Router.go('/account/watchlist')">
+            Your Watchlist
+          </button>
+        </div>
+        <div class="">
+          <br />
+          <br />
+          <button onclick="app.addNewPasskey()">
+            Add a new Passkey for faster login
+          </button>
+          <button
+            onclick="app.Router.go('/account/delete')"
+            style="background-color: red"
+          >
+            Delete Account
+          </button>
+        </div>
       </section>
     </template>
 
